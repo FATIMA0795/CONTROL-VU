@@ -516,18 +516,33 @@ function enviarBandeja(){
   });
 }
 
+let reportandoEAN = false;
 function reportarEAN(){
+  if(reportandoEAN)return;
   const ean=document.getElementById('ean').value.trim();
   const desc=document.getElementById('nf-descripcion').value.trim();
   const marca=document.getElementById('nf-marca').value.trim();
   if(!desc||!marca){alert('Completá descripción y marca');return;}
+  reportandoEAN=true;
+  const btn=document.querySelector('.btn-report');
+  btn.textContent='Enviando…';btn.disabled=true;
   fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({
     accion:'ean_desconocido',fecha:fechaHoyStr,ean,descripcion:desc,marca
   })})
   .then(()=>{
     document.getElementById('report-ok').classList.add('visible');
-    setTimeout(()=>{document.getElementById('ean').value='';resetResult();focoEAN();},2000);
-  }).catch(()=>alert('Error al reportar.'));
+    setTimeout(()=>{
+      document.getElementById('ean').value='';
+      resetResult();
+      focoEAN();
+      reportandoEAN=false;
+    },2000);
+  }).catch(()=>{
+    alert('Error al reportar.');
+    reportandoEAN=false;
+    btn.textContent='📢 Reportar a Recepciones';
+    btn.disabled=false;
+  });
 }
 </script>
 </body>
