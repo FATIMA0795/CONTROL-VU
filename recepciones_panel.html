@@ -288,7 +288,9 @@ function renderInc(inc,pendiente){
       <div class="badge ${pendiente?'pendiente':inc.estado}">${pendiente?'PENDIENTE':inc.estado}</div>
     </div>
     <div class="vu-bar-wrap">
-      <div class="vu-bar-label">Ingresa con <strong>${pctVU}% de vida útil</strong> (${dias} días de ${vuOrig})</div>
+      <div class="vu-bar-label" style="font-size:15px;font-weight:700;color:${barColor};margin-bottom:6px">
+        📊 Ingresa con el <strong>${pctVU}% de su vida útil</strong> (${dias} días restantes de ${vuOrig} totales)
+      </div>
       <div class="vu-bar-bg"><div class="vu-bar-fill" style="width:${Math.min(pctVU,100)}%;background:${barColor}"></div></div>
     </div>
     <div class="datos-grid">

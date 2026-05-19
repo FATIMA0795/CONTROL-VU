@@ -257,14 +257,40 @@ function pollIncidencias(){
 }
 setInterval(pollIncidencias,5000);
 
-// TESSERACT OCR
+// TESSERACT OCR OPTIMIZADO
 async function procesarFoto(input){
   if(!input.files||!input.files[0])return;
   const file=input.files[0];
   const ocr=document.getElementById('ocr-status');
-  ocr.textContent='📷 Procesando imagen…';
+  ocr.textContent='📷 Procesando…';
   try{
-    const {data:{text}}=await Tesseract.recognize(file,'spa+eng',{logger:()=>{}});
+    // Preprocesar imagen: reducir tamaño y aumentar contraste
+    const img=await createImageBitmap(file);
+    const canvas=document.createElement('canvas');
+    // Reducir a max 800px para acelerar
+    const scale=Math.min(800/img.width, 800/img.height, 1);
+    canvas.width=img.width*scale;
+    canvas.height=img.height*scale;
+    const ctx=canvas.getContext('2d');
+    ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    // Aumentar contraste para mejorar OCR
+    const imageData=ctx.getImageData(0,0,canvas.width,canvas.height);
+    const data=imageData.data;
+    for(let i=0;i<data.length;i+=4){
+      const avg=(data[i]+data[i+1]+data[i+2])/3;
+      const val=avg>128?255:0;
+      data[i]=data[i+1]=data[i+2]=val;
+    }
+    ctx.putImageData(imageData,0,0);
+    const blob=await new Promise(r=>canvas.toBlob(r,'image/png'));
+    
+    // Tesseract solo con números y caracteres de fecha, modo rápido
+    const {data:{text}}=await Tesseract.recognize(blob,'eng',{
+      logger:()=>{},
+      tessedit_char_whitelist:'0123456789/-.ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ',
+      tessedit_pageseg_mode:'6',
+      oem:'1'
+    });
     const fecha=extraerFecha(text);
     if(fecha){
       document.getElementById('fecha-venc').value=fecha;
@@ -274,7 +300,7 @@ async function procesarFoto(input){
       ocr.textContent='⚠ No se detectó fecha. Ingresala manualmente.';
     }
   }catch(e){
-    ocr.textContent='⚠ Error al procesar imagen. Ingresá la fecha manualmente.';
+    ocr.textContent='⚠ Error. Ingresá la fecha manualmente.';
   }
   input.value='';
 }
