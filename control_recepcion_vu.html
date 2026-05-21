@@ -270,7 +270,8 @@ function eliminarHistorial(id){
 
 function pollIncidencias(){
   const items=cargarLocal();
-  const pendientes=items.filter(i=>i.incidenciaId&&(!i.estado||i.estado==='PENDIENTE'));
+  // Monitorear tanto PENDIENTE como EN CONSULTA
+  const pendientes=items.filter(i=>i.incidenciaId&&(!i.estado||i.estado==='PENDIENTE'||i.estado==='EN CONSULTA'));
   if(pendientes.length===0)return;
   fetch(SCRIPT_URL+'?t='+Date.now())
   .then(r=>r.json())
@@ -278,7 +279,10 @@ function pollIncidencias(){
     let cambio=false;
     pendientes.forEach(p=>{
       const inc=data.find(d=>String(d.id)===String(p.incidenciaId));
-      if(inc&&inc.estado!=='PENDIENTE'){actualizarLocalItem(p.incidenciaId,inc.estado,inc.observacion||'');cambio=true;}
+      if(inc&&inc.estado!=='PENDIENTE'&&inc.estado!==p.estado){
+        actualizarLocalItem(p.incidenciaId,inc.estado,inc.observacion||'');
+        cambio=true;
+      }
     });
     if(cambio)renderHistorial();
   }).catch(()=>{});
