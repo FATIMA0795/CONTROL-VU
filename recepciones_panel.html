@@ -67,14 +67,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .recomendacion.aceptar{background:var(--green-bg);border-color:var(--green-border)}
 .recomendacion.rechazar{background:var(--red-bg);border-color:var(--red-border)}
 .recomendacion.evaluar{background:var(--warn-bg);border-color:var(--warn-border)}
+.recomendacion.consultar{background:#fff3e0;border-color:#ff9800}
 .rec-titulo{font-size:14px;font-weight:800;margin-bottom:4px}
 .recomendacion.aceptar .rec-titulo{color:var(--green-text)}
 .recomendacion.rechazar .rec-titulo{color:var(--red-text)}
 .recomendacion.evaluar .rec-titulo{color:var(--warn-text)}
+.recomendacion.consultar .rec-titulo{color:#e65100}
 .rec-detalle{font-size:12px;line-height:1.5}
 .recomendacion.aceptar .rec-detalle{color:#3a6b1a}
 .recomendacion.rechazar .rec-detalle{color:var(--red-text)}
 .recomendacion.evaluar .rec-detalle{color:var(--warn-text)}
+.recomendacion.consultar .rec-detalle{color:#e65100}
 
 .acciones{display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:12px}
 .obs-input{flex:1;min-width:180px;height:38px;border:1.5px solid var(--border);border-radius:8px;padding:0 12px;font-size:14px;outline:none}
@@ -172,53 +175,87 @@ function notificar(cantidad){
 
 function getRecomendacion(inc, art){
   if(!art) return {tipo:'evaluar', titulo:'⚠ Evaluar manualmente', detalle:'No hay datos suficientes para una recomendación automática.'};
+  
   const dias = parseInt(inc.dias);
-  const vuOrig = art.vu;
-  const pctVU = Math.round((dias / vuOrig) * 100);
-  const stock = art.stock;
-  const ventaSem = art.venta_sem;
+  const vuMin = art.vu_min || parseInt(inc.vu_min) || null;
+  const stock = art.stock !== null ? art.stock : null;
+  const ventaSem = art.venta_sem !== null ? art.venta_sem : null;
+  const cantidadIngresa = parseInt(inc.cantidad) || 0;
 
-  // Sin stock y sin ventas
+  // Garantía mínima al cliente = 50% de VU mínima
+  const garantiaCliente = vuMin ? Math.round(vuMin * 0.5) : null;
+
+  // Categoría según VU mínima
+  const esPerecedero = vuMin !== null && vuMin < 40;
+  const limiteSemanasStock = esPerecedero ? 2 : 3;
+  const categoria = esPerecedero ? 'Perecedero/Refrigerado (VU mín < 40 días)' : 'Seco/General (VU mín ≥ 40 días)';
+
+  // Sin datos suficientes
   if(stock === null && ventaSem === null){
-    return {tipo:'evaluar', titulo:'⚠ Evaluar manualmente', detalle:'Sin datos de stock ni ventas disponibles.'};
+    return {tipo:'evaluar', titulo:'⚠ Evaluar manualmente', detalle:`Sin datos de stock ni ventas. Categoría: ${categoria}`};
   }
 
-  // Calcular semanas para vender el stock actual + lote nuevo
-  if(ventaSem !== null && ventaSem > 0){
-    const semanasParaVender = stock !== null ? Math.ceil(stock / ventaSem) : null;
-    const semanasVida = Math.ceil(dias / 7);
-
-    if(semanasParaVender !== null){
-      if(semanasParaVender >= semanasVida){
-        return {
-          tipo:'rechazar',
-          titulo:'✘ RECHAZAR — Stock suficiente',
-          detalle:`Con ${stock} u. en stock y venta de ${ventaSem} u/sem, el stock actual dura ~${semanasParaVender} semanas. La mercadería vence en ${semanasVida} semanas. No conviene aceptar más.`
-        };
-      } else {
-        return {
-          tipo:'aceptar',
-          titulo:'✔ ACEPTAR — Stock bajo',
-          detalle:`Con ${stock} u. en stock y venta de ${ventaSem} u/sem, el stock actual dura ~${semanasParaVender} semanas. La mercadería vence en ${semanasVida} semanas. Conviene aceptar.`
-        };
-      }
-    } else {
-      const semanasVida2 = Math.ceil(dias / 7);
-      if(ventaSem * semanasVida2 > 0){
-        return {
-          tipo:'aceptar',
-          titulo:'✔ ACEPTAR — Se puede vender',
-          detalle:`Venta semanal: ${ventaSem} u/sem. En ${semanasVida2} semanas se podrían vender ~${Math.round(ventaSem*semanasVida2)} u. antes del vencimiento.`
-        };
-      }
+  if(ventaSem === null || ventaSem === 0){
+    if(stock === 0 || stock === null){
+      return {tipo:'aceptar', titulo:'✔ ACEPTAR — Sin stock ni ventas registradas', detalle:'No hay stock disponible. Conviene aceptar con precaución.'};
     }
+    return {tipo:'evaluar', titulo:'⚠ Evaluar manualmente', detalle:`Sin datos de venta semanal. Stock actual: ${stock} u. Consultá con Compras.`};
   }
 
-  if(stock === 0 || stock === null){
-    return {tipo:'aceptar', titulo:'✔ ACEPTAR — Sin stock', detalle:'No hay stock disponible del producto. Conviene aceptar aunque tenga fecha corta.'};
+  // Venta diaria (5 días hábiles)
+  const ventaDiaria = ventaSem / 5;
+  
+  // Stock simulado = stock actual + cantidad que ingresa
+  const stockSimulado = (stock || 0) + cantidadIngresa;
+  
+  // Días para vender todo el stock simulado
+  const diasParaVender = Math.ceil(stockSimulado / ventaDiaria);
+  const semanasStockSimulado = Math.round((diasParaVender / 7) * 10) / 10;
+
+  // Días restantes al último cliente
+  const diasAlUltimoCliente = dias - diasParaVender;
+
+  // Verificar garantía al cliente
+  const cumpleGarantia = garantiaCliente !== null ? diasAlUltimoCliente >= garantiaCliente : null;
+
+  // RECHAZAR si no cumple garantía al cliente
+  if(cumpleGarantia === false){
+    return {
+      tipo:'rechazar',
+      titulo:'✘ RECHAZAR — No llega con vida útil suficiente al cliente',
+      detalle:`Categoría: ${categoria}
+Stock simulado: ${stockSimulado} u. (${stock||0} actual + ${cantidadIngresa} ingresando)
+Días para vender todo: ${diasParaVender} días (${semanasStockSimulado} semanas)
+Días restantes al último cliente: ${diasAlUltimoCliente} días
+Garantía mínima al cliente: ${garantiaCliente} días (50% de VU mín)
+⚠ No alcanza. El último cliente recibiría el producto con ${diasAlUltimoCliente} días, por debajo de los ${garantiaCliente} requeridos.`
+    };
   }
 
-  return {tipo:'evaluar', titulo:'⚠ Evaluar manualmente', detalle:'Revisar stock y ventas antes de decidir.'};
+  // CONSULTAR A COMPRAS si el stock simulado supera el límite de semanas
+  if(semanasStockSimulado > limiteSemanasStock){
+    return {
+      tipo:'consultar',
+      titulo:`⚠ CONSULTAR A COMPRAS — Stock supera ${limiteSemanasStock} semanas`,
+      detalle:`Categoría: ${categoria}
+Stock simulado: ${stockSimulado} u. (${stock||0} actual + ${cantidadIngresa} ingresando)
+Semanas de stock: ${semanasStockSimulado} sem (límite: ${limiteSemanasStock} sem)
+Días restantes al último cliente: ${diasAlUltimoCliente} días ✔
+Garantía mínima al cliente: ${garantiaCliente||'N/A'} días
+Avisá a Compras por WhatsApp antes de tomar una decisión.`
+    };
+  }
+
+  // ACEPTAR
+  return {
+    tipo:'aceptar',
+    titulo:'✔ ACEPTAR',
+    detalle:`Categoría: ${categoria}
+Stock simulado: ${stockSimulado} u. (${stock||0} actual + ${cantidadIngresa} ingresando)
+Semanas de stock: ${semanasStockSimulado} sem (límite: ${limiteSemanasStock} sem) ✔
+Días restantes al último cliente: ${diasAlUltimoCliente} días ✔
+Garantía mínima al cliente: ${garantiaCliente||'N/A'} días ✔`
+  };
 }
 
 function cargar(manual){
@@ -294,6 +331,7 @@ function renderInc(inc,pendiente){
       <input type="text" class="obs-input" id="obs_${inc.id}" placeholder="Observación (opcional)…" />
       <button class="btn-aceptar" onclick="responder('${inc.id}','ACEPTADA')">✔ Aceptar</button>
       <button class="btn-rechazar" onclick="responder('${inc.id}','RECHAZADA')">✘ Rechazar</button>
+      <button style="height:38px;padding:0 16px;background:#e65100;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer" onclick="responder('${inc.id}','EN CONSULTA')">📲 Consultar a Compras</button>
     </div>` : `<div class="respuesta-dada">${inc.observacion ? '💬 ' + inc.observacion : ''}</div>`;
 
   return `<div class="inc ${pendiente?'pendiente':inc.estado}" id="inc_${inc.id}">
@@ -317,7 +355,7 @@ function renderInc(inc,pendiente){
       <div class="dato warn"><div class="dato-label">VU Mínima</div><div class="dato-val">${inc.vu_min||'–'}</div><div class="dato-unit">días</div></div>
       ${cantStr}${stockStr}${ventaStr}
     </div>
-    ${pendiente ? `<div class="recomendacion ${rec.tipo}"><div class="rec-titulo">${rec.titulo}</div><div class="rec-detalle">${rec.detalle}</div></div>` : ''}
+    ${pendiente ? `<div class="recomendacion ${rec.tipo}"><div class="rec-titulo">${rec.titulo}</div><div class="rec-detalle" style="white-space:pre-line">${rec.detalle}</div></div>` : ''}
     ${acciones}
   </div>`;
 }
