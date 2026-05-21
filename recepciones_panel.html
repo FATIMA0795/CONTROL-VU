@@ -301,8 +301,8 @@ function cargar(manual){
 }
 
 function renderIncidencias(data){
-  const pendientes=data.filter(d=>d.estado==='PENDIENTE');
-  const historial=data.filter(d=>d.estado!=='PENDIENTE').reverse();
+  const pendientes=data.filter(d=>d.estado==='PENDIENTE'||d.estado==='EN CONSULTA');
+  const historial=data.filter(d=>d.estado!=='PENDIENTE'&&d.estado!=='EN CONSULTA').reverse();
   document.getElementById('cnt-pendiente').textContent=pendientes.length;
   document.getElementById('cnt-aceptada').textContent=data.filter(d=>d.estado==='ACEPTADA').length;
   document.getElementById('cnt-rechazada').textContent=data.filter(d=>d.estado==='RECHAZADA').length;
@@ -341,7 +341,7 @@ function renderInc(inc,pendiente){
         <div class="inc-desc">${inc.descripcion}</div>
         <div class="inc-meta">EAN: ${inc.ean} &nbsp;|&nbsp; Recibido: ${fechaStr}</div>
       </div>
-      <div class="badge ${pendiente?'pendiente':inc.estado}">${pendiente?'PENDIENTE':inc.estado}</div>
+      <div class="badge ${pendiente?'pendiente':inc.estado}" style="${inc.estado==='EN CONSULTA'?'background:#fff3e0;color:#e65100;border-color:#ff9800':''}">${pendiente?'PENDIENTE':inc.estado}</div>
     </div>
     <div class="vu-bar-wrap">
       <div class="vu-bar-label" style="font-size:15px;font-weight:700;color:${barColor};margin-bottom:6px">

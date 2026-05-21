@@ -244,6 +244,7 @@ function renderHistorial(){
     let estadoClass='ok',estadoText='✔ OK';
     if(d.incidenciaId){
       if(d.estado==='PENDIENTE'){estadoClass='pendiente';estadoText='⏳ Esperando Recepciones';}
+      else if(d.estado==='EN CONSULTA'){estadoClass='pendiente';estadoText='📲 Consultando con Compras';}
       else if(d.estado==='ACEPTADA'){estadoClass='aceptada';estadoText='✔ Recepciones acepta'+(d.obs?' — '+d.obs:'');}
       else if(d.estado==='RECHAZADA'){estadoClass='rechazada';estadoText='✘ Recepciones rechaza'+(d.obs?' — '+d.obs:'');}
       else{estadoClass='pendiente';estadoText='⏳ Esperando Recepciones';}
