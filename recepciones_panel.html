@@ -137,9 +137,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <div id="stock-status" style="font-size:11px;color:var(--muted)">Sin actualizar</div>
       </div>
       <div style="flex:1;min-width:200px">
-        <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.8px">Ventas semanales (CSV de Maer)</div>
-        <input type="file" accept=".xlsx,.xls,.csv" onchange="cargarVentas(this)" style="font-size:12px;color:var(--muted);width:100%;margin-bottom:4px"/>
-        <div id="ventas-status" style="font-size:11px;color:var(--muted)">Sin actualizar</div>
+        <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.8px">Ventas semanales</div>
+        <button onclick="cargarVentasDesdeSheets()" style="width:100%;height:36px;background:var(--green-text);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:6px">↻ Actualizar desde Sheets</button>
+        <div id="ventas-status" style="font-size:11px;color:var(--muted)">Sin actualizar — hacé clic para cargar</div>
       </div>
     </div>
   </div>
@@ -396,6 +396,30 @@ function cargarStock(input){
   reader.readAsArrayBuffer(file);
 }
 
+function cargarVentasDesdeSheets(){
+  const statusEl = document.getElementById('ventas-status');
+  statusEl.innerHTML = '⏳ Cargando ventas desde Sheets…';
+  fetch(SCRIPT_URL + '?tipo=ventas&t=' + Date.now())
+  .then(r => r.json())
+  .then(ventas => {
+    let count = 0;
+    for(const ean in ventas){
+      if(ART[ean] !== undefined){
+        ART[ean].venta_sem = ventas[ean];
+      } else {
+        ART[ean] = ART[ean] || {};
+        ART[ean].venta_sem = ventas[ean];
+      }
+      count++;
+    }
+    statusEl.innerHTML = '<span style="color:var(--green-text)">✔ Ventas actualizadas automáticamente: ' + count + ' artículos</span>';
+  })
+  .catch(() => {
+    statusEl.innerHTML = '<span style="color:var(--red-text)">⚠ Error al cargar ventas. Intentá de nuevo.</span>';
+  });
+}
+
+// Mantener opción manual como respaldo
 function cargarVentas(input){
   const file=input.files[0];
   if(!file)return;
@@ -456,6 +480,7 @@ function consultarCompras(id, desc, ean, dias, cantidad, vuMin, vuOrig){
 }
 
 cargar(true);
+cargarVentasDesdeSheets();
 setInterval(()=>{
   const activo=document.activeElement;
   if(activo&&activo.classList.contains('obs-input'))return;
