@@ -257,6 +257,16 @@ function renderHistorial(){
 }
 renderHistorial();
 
+function eliminarHistorial(id){
+  try{
+    const key='hist_'+fechaHoyStr.replace(/\//g,'_');
+    const items=JSON.parse(localStorage.getItem(key)||'[]');
+    const nuevos=items.filter(i=>String(i.id)!==String(id));
+    localStorage.setItem(key,JSON.stringify(nuevos));
+    renderHistorial();
+  }catch(e){}
+}
+
 function pollIncidencias(){
   const items=cargarLocal();
   const pendientes=items.filter(i=>i.incidenciaId&&(!i.estado||i.estado==='PENDIENTE'));
@@ -452,8 +462,9 @@ function renderBandeja(){
   if(bandeja.length===0){card.classList.remove('visible');return;}
   card.classList.add('visible');
   el.innerHTML=bandeja.map((b,i)=>`
-    <div class="bandeja-item">
-      <div class="bandeja-item-desc">${b.descripcion}</div>
+    <div class="bandeja-item" style="position:relative">
+      <button onclick="eliminarBandeja(${i})" style="position:absolute;top:4px;right:6px;background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted);padding:2px 6px" title="Eliminar">✕</button>
+      <div class="bandeja-item-desc" style="padding-right:24px">${b.descripcion}</div>
       <div class="bandeja-item-meta">EAN: ${b.ean} | Vto: ${b.fecha_vto} | Días: ${b.dias} | Cant: ${b.cantidad||'–'}</div>
     </div>`).join('');
 }
@@ -478,6 +489,11 @@ function avisarIncidencia(){
   document.getElementById('ean').value='';
   resetResult();
   focoEAN();
+}
+
+function eliminarBandeja(idx){
+  bandeja.splice(idx,1);
+  renderBandeja();
 }
 
 function enviarBandeja(){
