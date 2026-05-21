@@ -331,7 +331,7 @@ function renderInc(inc,pendiente){
       <input type="text" class="obs-input" id="obs_${inc.id}" placeholder="Observación (opcional)…" />
       <button class="btn-aceptar" onclick="responder('${inc.id}','ACEPTADA')">✔ Aceptar</button>
       <button class="btn-rechazar" onclick="responder('${inc.id}','RECHAZADA')">✘ Rechazar</button>
-      <button style="height:38px;padding:0 16px;background:#e65100;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer" onclick="responder('${inc.id}','EN CONSULTA')">📲 Consultar a Compras</button>
+      <button style="height:38px;padding:0 16px;background:#e65100;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer" onclick="consultarCompras('${inc.id}','${inc.descripcion}','${inc.ean}','${inc.dias}','${inc.cantidad}','${inc.vu_min}','${inc.vu_orig}')">📲 Consultar a Compras</button>
     </div>` : `<div class="respuesta-dada">${inc.observacion ? '💬 ' + inc.observacion : ''}</div>`;
 
   return `<div class="inc ${pendiente?'pendiente':inc.estado}" id="inc_${inc.id}">
@@ -433,6 +433,26 @@ function cargarVentas(input){
     }
   };
   reader.readAsArrayBuffer(file);
+}
+
+function consultarCompras(id, desc, ean, dias, cantidad, vuMin, vuOrig){
+  // Registrar en Sheets como EN CONSULTA
+  responder(id, 'EN CONSULTA');
+  // Calcular porcentaje de VU y garantía
+  const pct = vuOrig ? Math.round((parseInt(dias) / parseInt(vuOrig)) * 100) : 'N/A';
+  const garantia = vuMin ? Math.round(parseInt(vuMin) * 0.5) : 'N/A';
+  // Armar mensaje de WhatsApp
+  const msg = 
+    '🔴 *CONSULTA DE RECEPCIÓN — FECHA CORTA*%0A%0A' +
+    '📦 *Producto:* ' + desc + '%0A' +
+    '🔢 *EAN:* ' + ean + '%0A' +
+    '📅 *Días restantes:* ' + dias + ' días%0A' +
+    '📊 *% de vida útil al ingresar:* ' + pct + '%25%0A' +
+    '📦 *Cantidad ingresando:* ' + (cantidad||'N/D') + ' u.%0A' +
+    '⏱ *Garantía mínima al cliente:* ' + garantia + ' días%0A%0A' +
+    '¿Aceptamos o rechazamos? Por favor responder a la brevedad.';
+  // Abrir WhatsApp
+  window.open('https://wa.me/5491168505830?text=' + msg, '_blank');
 }
 
 cargar(true);
