@@ -181,9 +181,11 @@ function getRecomendacion(inc, art){
   
   const dias = parseInt(inc.dias);
   const vuMin = art.vu_min || parseInt(inc.vu_min) || null;
-  const stock = art.stock !== null ? art.stock : null;
-  const ventaSem = art.venta_sem !== null ? art.venta_sem : null;
+  const stockMaer = art.stock !== null ? art.stock : null;
   const cantidadIngresa = parseInt(inc.cantidad) || 0;
+  // Stock simulado = stock actual de Maer + cantidad que está ingresando
+  const stock = stockMaer !== null ? stockMaer + cantidadIngresa : null;
+  const ventaSem = art.venta_sem !== null ? art.venta_sem : null;
 
   // Garantía mínima al cliente = 50% de VU mínima
   const garantiaCliente = vuMin ? Math.round(vuMin * 0.5) : null;
@@ -209,7 +211,8 @@ function getRecomendacion(inc, art){
   const ventaDiaria = ventaSem / 5;
   
   // Stock simulado = stock actual + cantidad que ingresa
-  const stockSimulado = (stock || 0) + cantidadIngresa;
+  // stock ya incluye cantidadIngresa (stockMaer + cantidadIngresa)
+  const stockSimulado = stock || cantidadIngresa;
   
   // Días para vender todo el stock simulado
   const diasParaVender = Math.ceil(stockSimulado / ventaDiaria);
@@ -241,7 +244,7 @@ Garantía mínima al cliente: ${garantiaCliente} días (50% de VU mín)
       tipo:'consultar',
       titulo:`⚠ CONSULTAR A COMPRAS — Stock supera ${limiteSemanasStock} semanas`,
       detalle:`Categoría: ${categoria}
-Stock simulado: ${stockSimulado} u. (${stock||0} actual + ${cantidadIngresa} ingresando)
+Stock Maer: ${stockMaer||0} u. + ${cantidadIngresa} u. ingresando = Stock simulado: ${stock} u.
 Semanas de stock: ${semanasStockSimulado} sem (límite: ${limiteSemanasStock} sem)
 Días restantes al último cliente: ${diasAlUltimoCliente} días ✔
 Garantía mínima al cliente: ${garantiaCliente||'N/A'} días
@@ -254,7 +257,7 @@ Avisá a Compras por WhatsApp antes de tomar una decisión.`
     tipo:'aceptar',
     titulo:'✔ ACEPTAR',
     detalle:`Categoría: ${categoria}
-Stock simulado: ${stockSimulado} u. (${stock||0} actual + ${cantidadIngresa} ingresando)
+Stock Maer: ${stockMaer||0} u. + ${cantidadIngresa} u. ingresando = Stock simulado: ${stock} u.
 Semanas de stock: ${semanasStockSimulado} sem (límite: ${limiteSemanasStock} sem) ✔
 Días restantes al último cliente: ${diasAlUltimoCliente} días ✔
 Garantía mínima al cliente: ${garantiaCliente||'N/A'} días ✔`
@@ -359,7 +362,7 @@ function renderInc(inc,pendiente){
   const rec = getRecomendacion(inc, art);
   const fechaStr = inc.fecha ? String(inc.fecha).split('T')[0] : '';
   const cantStr = inc.cantidad ? `<div class="dato warn"><div class="dato-label">Cant. fecha corta</div><div class="dato-val">${inc.cantidad}</div><div class="dato-unit">unidades</div></div>` : '';
-  const stockStr = stock !== null ? `<div class="dato ${stock < 10 ? 'alerta' : 'ok'}"><div class="dato-label">Stock actual</div><div class="dato-val">${stock}</div><div class="dato-unit">unidades</div></div>` : '';
+
   const ventaStr = ventaSem !== null ? `<div class="dato"><div class="dato-label">Venta semanal</div><div class="dato-val">${ventaSem}</div><div class="dato-unit">u/semana prom.</div></div>` : '';
   const acciones = pendiente ? `
     <div class="acciones">
