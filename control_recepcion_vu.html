@@ -177,6 +177,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="label">Reportar EAN desconocido a Recepciones</div>
       <input type="text" id="nf-descripcion" placeholder="Descripción del producto…" />
       <input type="text" id="nf-marca" placeholder="Marca…" />
+      <input type="number" id="nf-cantidad" placeholder="Cantidad recibida…" min="1" inputmode="numeric" />
       <button class="btn-report" onclick="reportarEAN()">📢 Reportar a Recepciones</button>
       <div class="report-ok" id="report-ok">✔ Reportado correctamente</div>
     </div>
@@ -255,7 +256,9 @@ function renderHistorial(){
       else{estadoClass='pendiente';estadoText='📢 EAN reportado — Esperando respuesta';}
     }
     return `<div class="hist-item ${estadoClass}">
-      <div class="hist-desc">${d.descripcion}</div>
+      <div class="hist-desc" style="position:relative">
+      <button onclick="eliminarHistorial('${d.id}')" style="position:absolute;top:4px;right:4px;background:none;border:none;cursor:pointer;font-size:13px;color:#999;padding:2px 6px" title="Eliminar">✕</button>
+      <div class="hist-desc" style="padding-right:20px">${d.descripcion}</div>
       <div class="hist-meta">Vto: ${d.fecha_vto} | Días: ${d.dias} | Cant: ${d.cantidad||'–'}</div>
       <div class="hist-estado ${estadoClass}">${estadoText}</div>
     </div>`;
@@ -587,13 +590,14 @@ function reportarEAN(){
   reportandoEAN=true;
   const btn=document.querySelector('.btn-report');
   btn.textContent='Enviando…';btn.disabled=true;
+  const cantidad=document.getElementById('nf-cantidad')?document.getElementById('nf-cantidad').value||'':'';
   fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({
-    accion:'ean_desconocido',fecha:fechaHoyStr,ean,descripcion:desc,marca
+    accion:'ean_desconocido',fecha:fechaHoyStr,ean,descripcion:desc,marca,cantidad
   })})
   .then(()=>{
     // Guardar en historial local
     const id=Date.now();
-    guardarLocal({id,ean,descripcion:desc,marca,fecha_vto:'–',dias:'–',cantidad:'–',resultado:'EAN DESCONOCIDO'});
+    guardarLocal({id,ean,descripcion:desc,marca,fecha_vto:'–',dias:'–',cantidad:cantidad||'–',resultado:'EAN DESCONOCIDO'});
     renderHistorial();
     document.getElementById('report-ok').classList.add('visible');
     setTimeout(()=>{
