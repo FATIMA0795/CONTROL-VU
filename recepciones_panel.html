@@ -517,7 +517,6 @@ function responderEAN(ean, estado){
   const el=document.getElementById('ean_'+ean);
   if(el){el.style.opacity='.5';el.style.pointerEvents='none';}
   fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'responder_ean',ean,estado,observacion:obs})})
-  .then(r=>r.json())
   .then(()=>setTimeout(()=>cargar(false),1500))
   .catch(()=>{if(el){el.style.opacity='1';el.style.pointerEvents='auto';}alert('Error. Intentá de nuevo.');});
 }
