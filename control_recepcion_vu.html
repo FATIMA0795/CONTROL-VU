@@ -270,9 +270,26 @@ function eliminarHistorial(id){
   try{
     const key='hist_'+fechaHoyStr.replace(/\//g,'_');
     const items=JSON.parse(localStorage.getItem(key)||'[]');
+    const item=items.find(i=>String(i.id)===String(id));
     const nuevos=items.filter(i=>String(i.id)!==String(id));
     localStorage.setItem(key,JSON.stringify(nuevos));
     renderHistorial();
+    // Borrar de Sheets también
+    if(item){
+      let hoja='RECEPCIONES';
+      let campo='fecha_vto';
+      let valor=item.fecha_vto;
+      if(item.incidenciaId){hoja='RECEPCION CON INCIDENCIAS';campo='incidenciaId';valor=item.incidenciaId;}
+      else if(item.resultado==='EAN DESCONOCIDO'){hoja='EAN DESCONOCIDOS';campo='ean';valor=item.ean;}
+      fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({
+        accion:'eliminar',
+        hoja,
+        campo,
+        valor,
+        ean:item.ean,
+        fecha:fechaHoyStr
+      })}).catch(()=>{});
+    }
   }catch(e){}
 }
 
