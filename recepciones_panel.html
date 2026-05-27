@@ -265,7 +265,10 @@ Garantía mínima al cliente: ${garantiaCliente||'N/A'} días ✔`
 }
 
 function cargar(manual){
-  if(manual) document.getElementById('pendientes').innerHTML='<div class="loading">Actualizando…</div>';
+  if(manual){
+    const el=document.getElementById('pendientes');
+    if(el&&el.innerHTML.indexOf('loading')===-1) el.innerHTML='<div class="loading">Actualizando…</div>';
+  }
   fetch(SCRIPT_URL+'?t='+Date.now())
   .then(r=>r.json())
   .then(data=>{
@@ -337,20 +340,20 @@ function cargar(manual){
 }
 
 function renderIncidencias(data){
-  // Filtrar por fecha local argentina (UTC-3)
+  // Pendientes e EN CONSULTA: mostrar todas sin filtro de fecha
+  const pendientes=data.filter(d=>d.estado==='PENDIENTE'||d.estado==='EN CONSULTA');
+  // Historial: solo de hoy
   const hoyLocal = new Date();
   hoyLocal.setHours(0,0,0,0);
   const mananaLocal = new Date(hoyLocal);
   mananaLocal.setDate(mananaLocal.getDate()+1);
-  const deHoy=d=>{
+  const historial=data.filter(d=>{
+    if(d.estado==='PENDIENTE'||d.estado==='EN CONSULTA') return false;
     const f=d.fecha;
     if(!f) return false;
-    // Formato ISO con zona horaria
     const fechaD = new Date(f);
     return fechaD >= hoyLocal && fechaD < mananaLocal;
-  };
-  const pendientes=data.filter(d=>(d.estado==='PENDIENTE'||d.estado==='EN CONSULTA')&&deHoy(d));
-  const historial=data.filter(d=>d.estado!=='PENDIENTE'&&d.estado!=='EN CONSULTA'&&deHoy(d)).reverse();
+  }).reverse();
   document.getElementById('cnt-pendiente').textContent=pendientes.length;
   document.getElementById('cnt-aceptada').textContent=data.filter(d=>d.estado==='ACEPTADA').length;
   document.getElementById('cnt-rechazada').textContent=data.filter(d=>d.estado==='RECHAZADA').length;
