@@ -249,6 +249,7 @@ function renderHistorial(){
       else if(d.estado==='RECHAZADA'){estadoClass='rechazada';estadoText='✘ Recepciones rechaza'+(d.obs?' — '+d.obs:'');}
       else{estadoClass='pendiente';estadoText='⏳ Esperando Recepciones';}
     } else if(d.resultado==='FECHA CORTA'){estadoClass='corta';estadoText='✘ Fecha corta';}
+    else if(d.resultado==='EAN DESCONOCIDO'){estadoClass='pendiente';estadoText='📢 EAN reportado a Recepciones';}
     return `<div class="hist-item ${estadoClass}">
       <div class="hist-desc">${d.descripcion}</div>
       <div class="hist-meta">Vto: ${d.fecha_vto} | Días: ${d.dias} | Cant: ${d.cantidad||'–'}</div>
@@ -287,7 +288,7 @@ function pollIncidencias(){
     if(cambio)renderHistorial();
   }).catch(()=>{});
 }
-setInterval(pollIncidencias,5000);
+setInterval(pollIncidencias,2000);
 
 // TESSERACT OCR OPTIMIZADO
 async function procesarFoto(input){
@@ -551,6 +552,10 @@ function reportarEAN(){
     accion:'ean_desconocido',fecha:fechaHoyStr,ean,descripcion:desc,marca
   })})
   .then(()=>{
+    // Guardar en historial local
+    const id=Date.now();
+    guardarLocal({id,ean,descripcion:desc,marca,fecha_vto:'–',dias:'–',cantidad:'–',resultado:'EAN DESCONOCIDO'});
+    renderHistorial();
     document.getElementById('report-ok').classList.add('visible');
     setTimeout(()=>{
       document.getElementById('ean').value='';
