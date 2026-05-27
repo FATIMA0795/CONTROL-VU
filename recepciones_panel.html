@@ -124,6 +124,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="incidencias" id="pendientes"><div class="loading">Cargando…</div></div>
   <div class="seccion-titulo">📋 Historial de Incidencias</div>
   <div class="incidencias" id="historial-inc"></div>
+  <div class="seccion-titulo">🔍 EAN Desconocidos</div>
+  <div class="incidencias" id="ean-desconocidos"><div class="loading">Cargando…</div></div>
+
   <div class="seccion-titulo">📦 Recepciones del día</div>
   <div class="hist-grid" id="historial-rec"><div class="empty">Cargando…</div></div>
 
@@ -477,6 +480,17 @@ function consultarCompras(id, desc, ean, dias, cantidad, vuMin, vuOrig){
     '¿Aceptamos o rechazamos? Por favor responder a la brevedad.';
   // Abrir WhatsApp
   window.open('https://wa.me/5491168505830?text=' + msg, '_blank');
+}
+
+function responderEAN(ean, estado){
+  const obsEl=document.getElementById('obs_ean_'+ean);
+  const obs=obsEl?obsEl.value:'';
+  const el=document.getElementById('ean_'+ean);
+  if(el){el.style.opacity='.5';el.style.pointerEvents='none';}
+  fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'responder_ean',ean,estado,observacion:obs})})
+  .then(r=>r.json())
+  .then(()=>setTimeout(()=>cargar(false),1500))
+  .catch(()=>{if(el){el.style.opacity='1';el.style.pointerEvents='auto';}alert('Error. Intentá de nuevo.');});
 }
 
 cargar(true);
