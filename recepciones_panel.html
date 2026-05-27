@@ -409,7 +409,7 @@ function renderInc(inc,pendiente){
       <div class="dato ${pctClass}"><div class="dato-label">% VU al ingresar</div><div class="dato-val">${pctVU}%</div><div class="dato-unit">de vida útil</div></div>
       <div class="dato"><div class="dato-label">VU Original</div><div class="dato-val">${inc.vu_orig}</div><div class="dato-unit">días</div></div>
       <div class="dato warn"><div class="dato-label">VU Mínima</div><div class="dato-val">${inc.vu_min||'–'}</div><div class="dato-unit">días</div></div>
-      ${cantStr}${stockStr}${ventaStr}
+      ${cantStr}${stockChip}${ventaStr}
     </div>
     ${pendiente ? `<div class="recomendacion ${rec.tipo}"><div class="rec-titulo">${rec.titulo}</div><div class="rec-detalle" style="white-space:pre-line">${rec.detalle}</div></div>` : ''}
     ${acciones}
