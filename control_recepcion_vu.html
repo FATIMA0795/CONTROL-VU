@@ -249,7 +249,11 @@ function renderHistorial(){
       else if(d.estado==='RECHAZADA'){estadoClass='rechazada';estadoText='✘ Recepciones rechaza'+(d.obs?' — '+d.obs:'');}
       else{estadoClass='pendiente';estadoText='⏳ Esperando Recepciones';}
     } else if(d.resultado==='FECHA CORTA'){estadoClass='corta';estadoText='✘ Fecha corta';}
-    else if(d.resultado==='EAN DESCONOCIDO'){estadoClass='pendiente';estadoText='📢 EAN reportado a Recepciones';}
+    else if(d.resultado==='EAN DESCONOCIDO'){
+      if(d.estadoEAN==='ACEPTADA'){estadoClass='aceptada';estadoText='✔ Recepciones: Lo trabajamos'+(d.obsEAN?' — '+d.obsEAN:'');}
+      else if(d.estadoEAN==='RECHAZADA'){estadoClass='rechazada';estadoText='✘ Recepciones: No lo trabajamos'+(d.obsEAN?' — '+d.obsEAN:'');}
+      else{estadoClass='pendiente';estadoText='📢 EAN reportado — Esperando respuesta';}
+    }
     return `<div class="hist-item ${estadoClass}">
       <div class="hist-desc">${d.descripcion}</div>
       <div class="hist-meta">Vto: ${d.fecha_vto} | Días: ${d.dias} | Cant: ${d.cantidad||'–'}</div>
@@ -271,22 +275,57 @@ function eliminarHistorial(id){
 
 function pollIncidencias(){
   const items=cargarLocal();
-  // Monitorear tanto PENDIENTE como EN CONSULTA
+  // Monitorear incidencias de fecha corta (PENDIENTE y EN CONSULTA)
   const pendientes=items.filter(i=>i.incidenciaId&&(!i.estado||i.estado==='PENDIENTE'||i.estado==='EN CONSULTA'));
-  if(pendientes.length===0)return;
-  fetch(SCRIPT_URL+'?t='+Date.now())
-  .then(r=>r.json())
-  .then(data=>{
-    let cambio=false;
-    pendientes.forEach(p=>{
-      const inc=data.find(d=>String(d.id)===String(p.incidenciaId));
-      if(inc&&inc.estado!=='PENDIENTE'&&inc.estado!==p.estado){
-        actualizarLocalItem(p.incidenciaId,inc.estado,inc.observacion||'');
-        cambio=true;
-      }
-    });
-    if(cambio)renderHistorial();
-  }).catch(()=>{});
+  // Monitorear EAN desconocidos pendientes
+  const eanPendientes=items.filter(i=>i.resultado==='EAN DESCONOCIDO'&&(!i.estadoEAN||i.estadoEAN==='PENDIENTE'));
+
+  const promesas=[];
+
+  if(pendientes.length>0){
+    promesas.push(
+      fetch(SCRIPT_URL+'?t='+Date.now())
+      .then(r=>r.json())
+      .then(data=>{
+        let cambio=false;
+        pendientes.forEach(p=>{
+          const inc=data.find(d=>String(d.id)===String(p.incidenciaId));
+          if(inc&&inc.estado!=='PENDIENTE'&&inc.estado!==p.estado){
+            actualizarLocalItem(p.incidenciaId,inc.estado,inc.observacion||'');
+            cambio=true;
+          }
+        });
+        if(cambio)renderHistorial();
+      }).catch(()=>{})
+    );
+  }
+
+  if(eanPendientes.length>0){
+    promesas.push(
+      fetch(SCRIPT_URL+'?tipo=ean_desconocidos&t='+Date.now())
+      .then(r=>r.json())
+      .then(data=>{
+        let cambio=false;
+        eanPendientes.forEach(p=>{
+          const eanData=data.find(d=>String(d.ean)===String(p.ean)&&d.estado!=='PENDIENTE');
+          if(eanData){
+            try{
+              const key='hist_'+fechaHoyStr.replace(/\//g,'_');
+              const items2=JSON.parse(localStorage.getItem(key)||'[]');
+              const idx=items2.findIndex(i=>String(i.id)===String(p.id));
+              if(idx>=0){
+                items2[idx].estadoEAN=eanData.estado;
+                items2[idx].obsEAN=eanData.observacion||'';
+                localStorage.setItem(key,JSON.stringify(items2));
+                cambio=true;
+              }
+            }catch(e){}
+          }
+        });
+        if(cambio)renderHistorial();
+      }).catch(()=>{})
+    );
+  }
 }
 setInterval(pollIncidencias,2000);
 
