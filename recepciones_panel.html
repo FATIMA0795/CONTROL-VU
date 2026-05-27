@@ -382,6 +382,10 @@ function renderInc(inc,pendiente){
   const cantStr = inc.cantidad ? `<div class="dato warn"><div class="dato-label">Cant. fecha corta</div><div class="dato-val">${inc.cantidad}</div><div class="dato-unit">unidades</div></div>` : '';
 
   const ventaStr = ventaSem !== null ? `<div class="dato"><div class="dato-label">Venta semanal</div><div class="dato-val">${ventaSem}</div><div class="dato-unit">u/semana prom.</div></div>` : '';
+  const stockMaerVal = art && art.stock !== null ? art.stock : null;
+  const cantIngresa = parseInt(inc.cantidad) || 0;
+  const stockSimVal = stockMaerVal !== null ? stockMaerVal + cantIngresa : null;
+  const stockChip = stockSimVal !== null ? `<div class="dato" style="background:#e3f2fd;border-color:#1565c0"><div class="dato-label">Stock Maer + ingresando</div><div class="dato-val" style="font-size:16px">${stockMaerVal} + ${cantIngresa} = ${stockSimVal}</div><div class="dato-unit">u. simulado</div></div>` : '';
   const acciones = pendiente ? `
     <div class="acciones">
       <input type="text" class="obs-input" id="obs_${inc.id}" placeholder="Observación (opcional)…" />
