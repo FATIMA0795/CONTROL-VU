@@ -282,7 +282,12 @@ function cargar(manual){
     document.getElementById('ultimo-update').textContent='Actualizado: '+String(ahora.getHours()).padStart(2,'0')+':'+String(ahora.getMinutes()).padStart(2,'0')+':'+String(ahora.getSeconds()).padStart(2,'0');
   }).catch(()=>{
     document.getElementById('error-banner').classList.add('visible');
-    if(ultimosDatos.length===0) document.getElementById('pendientes').innerHTML='<div class="empty">Error al cargar. Hacé clic en Actualizar.</div>';
+    if(ultimosDatos.length===0){
+      document.getElementById('pendientes').innerHTML='<div class="empty">Error al cargar. Hacé clic en Actualizar.</div>';
+    } else {
+      // Usar datos en caché para renderizar aunque falle el fetch
+      renderIncidencias(ultimosDatos);
+    }
   });
 
   fetch(SCRIPT_URL+'?tipo=historial&t='+Date.now())
