@@ -320,24 +320,29 @@ function cargar(manual){
     const el=document.getElementById('ean-desconocidos');
     if(!el)return;
     const hoyStr2=new Date().toISOString().substring(0,10);
-    const pendientes=data.filter(d=>d.estado==='PENDIENTE'&&String(d.fecha).substring(0,10)===hoyStr2);
-    if(pendientes.length===0){el.innerHTML='<div class="empty">Sin EAN desconocidos pendientes</div>';return;}
-    el.innerHTML=pendientes.map(d=>`
-      <div class="inc pendiente" id="ean_${d.ean}">
+    const todosHoy=data.filter(d=>String(d.fecha).substring(0,10)===hoyStr2);
+    if(todosHoy.length===0){el.innerHTML='<div class="empty">Sin EAN desconocidos hoy</div>';return;}
+    const pendientesEAN=todosHoy.filter(d=>d.estado==='PENDIENTE');
+    const respondidosEAN=todosHoy.filter(d=>d.estado!=='PENDIENTE');
+    el.innerHTML=[...pendientesEAN,...respondidosEAN].map(d=>{
+      const esPend=d.estado==='PENDIENTE';
+      return `
+      <div class="inc ${esPend?'pendiente':d.estado}" id="ean_${d.ean}">
         <div class="inc-header">
           <div>
             <div class="inc-marca">${d.marca||'Sin marca'}</div>
             <div class="inc-desc">${d.descripcion||'Sin descripción'}</div>
             <div class="inc-meta">EAN: ${d.ean} &nbsp;|&nbsp; Reportado: ${String(d.fecha).split('T')[0]}</div>
           </div>
-          <div class="badge pendiente">PENDIENTE</div>
+          <div class="badge ${esPend?'pendiente':d.estado}">${esPend?'PENDIENTE':d.estado}</div>
         </div>
-        <div class="acciones">
+        ${esPend ? `<div class="acciones">
           <input type="text" class="obs-input" id="obs_ean_${d.ean}" placeholder="Observación (opcional)…" />
           <button class="btn-aceptar" onclick="responderEAN('${d.ean}','ACEPTADA')">✔ Lo trabajamos</button>
           <button class="btn-rechazar" onclick="responderEAN('${d.ean}','RECHAZADA')">✘ No lo trabajamos</button>
-        </div>
-      </div>`).join('');
+        </div>` : `<div class="respuesta-dada">💬 ${d.observacion||''}</div>`}
+      </div>`;
+    }).join('');
   }).catch(()=>{
     const el=document.getElementById('ean-desconocidos');
     if(el)el.innerHTML='<div class="empty">Error al cargar EAN desconocidos.</div>';
