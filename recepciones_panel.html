@@ -147,11 +147,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div style="flex:1;min-width:200px">
         <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.8px">Stock del día (Excel de Maer)</div>
         <input type="file" accept=".xlsx,.xls" onchange="cargarStock(this)" style="font-size:12px;color:var(--muted);width:100%;margin-bottom:4px"/>
+        <button onclick="cargarStockDesdeSheets()" style="width:100%;height:32px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:4px">↻ Actualizar desde Sheets</button>
         <div id="stock-status" style="font-size:11px;color:var(--muted)">Sin actualizar</div>
       </div>
       <div style="flex:1;min-width:200px">
         <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.8px">Artículos + Conserva (Excel de Maer)</div>
         <input type="file" accept=".xlsx,.xls" onchange="cargarArticulos(this)" style="font-size:12px;color:var(--muted);width:100%;margin-bottom:4px"/>
+        <button onclick="cargarArticulosDesdeSheets()" style="width:100%;height:32px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:4px">↻ Actualizar desde Sheets</button>
         <div id="articulos-status" style="font-size:11px;color:var(--muted)">Sin actualizar</div>
       </div>
       <div style="flex:1;min-width:200px">
@@ -408,7 +410,10 @@ function renderInc(inc,pendiente){
   const fechaStr = inc.fecha ? String(inc.fecha).split('T')[0] : '';
   const cantStr = inc.cantidad ? `<div class="dato warn"><div class="dato-label">Cant. fecha corta</div><div class="dato-val">${inc.cantidad}</div><div class="dato-unit">unidades</div></div>` : '';
 
-  const stockChip = stock !== null ? `<div class="dato"><div class="dato-label">Stock actual</div><div class="dato-val">${stock}</div><div class="dato-unit">unidades</div></div>` : '';
+  const stockMaerLocal = art ? (art.stock !== null ? art.stock : null) : null;
+  const cantIngresa = parseInt(inc.cantidad) || 0;
+  const stockSimuladoLocal = stockMaerLocal !== null ? stockMaerLocal + cantIngresa : (cantIngresa || null);
+  const stockChip = stockSimuladoLocal !== null ? `<div class="dato" style="background:#e8f4fd;border-color:#90caf9"><div class="dato-label">Stock Maer +<br>Ingresando</div><div class="dato-val" style="font-size:13px">${stockMaerLocal||0} + ${cantIngresa} = <strong>${stockSimuladoLocal}</strong></div><div class="dato-unit">u. simulado</div></div>` : '';
   const ventaStr = ventaSem !== null ? `<div class="dato"><div class="dato-label">Venta semanal</div><div class="dato-val">${ventaSem}</div><div class="dato-unit">u/semana prom.</div></div>` : '';
   const acciones = pendiente ? `
     <div class="acciones">
@@ -558,6 +563,52 @@ function cargarStock(input){
   reader.readAsArrayBuffer(file);
 }
 
+
+function cargarArticulosDesdeSheets(){
+  const statusEl = document.getElementById('articulos-status');
+  statusEl.innerHTML = '⏳ Cargando artículos desde Sheets…';
+  fetch(SCRIPT_URL + '?tipo=articulos&t=' + Date.now())
+  .then(r => r.json())
+  .then(arts => {
+    let count = 0;
+    for(const ean in arts){
+      const a = arts[ean];
+      if(!ART[ean]) ART[ean] = {};
+      ART[ean].desc = a.desc || ART[ean].desc || '';
+      ART[ean].marca = a.marca || ART[ean].marca || '';
+      ART[ean].vu = Number(a.vu) || ART[ean].vu || 0;
+      ART[ean].vu_min = a.vu_min ? Number(a.vu_min) : ART[ean].vu_min;
+      ART[ean].conserva = a.conserva || ART[ean].conserva || '';
+      count++;
+    }
+    statusEl.innerHTML = '<span style="color:var(--green-text)">✔ Artículos desde Sheets: ' + count + ' registros</span>';
+    if(ultimosDatos.length > 0) renderIncidencias(ultimosDatos);
+  })
+  .catch(() => {
+    statusEl.innerHTML = '<span style="color:var(--red-text)">⚠ Error al cargar artículos desde Sheets</span>';
+  });
+}
+
+function cargarStockDesdeSheets(){
+  const statusEl = document.getElementById('stock-status');
+  statusEl.innerHTML = '⏳ Cargando stock desde Sheets…';
+  fetch(SCRIPT_URL + '?tipo=stock&t=' + Date.now())
+  .then(r => r.json())
+  .then(stocks => {
+    let count = 0;
+    for(const ean in stocks){
+      if(!ART[ean]) ART[ean] = {};
+      ART[ean].stock = Number(stocks[ean]);
+      count++;
+    }
+    statusEl.innerHTML = '<span style="color:var(--green-text)">✔ Stock desde Sheets: ' + count + ' artículos</span>';
+    if(ultimosDatos.length > 0) renderIncidencias(ultimosDatos);
+  })
+  .catch(() => {
+    statusEl.innerHTML = '<span style="color:var(--red-text)">⚠ Error al cargar stock desde Sheets</span>';
+  });
+}
+
 function cargarVentasDesdeSheets(){
   const statusEl = document.getElementById('ventas-status');
   statusEl.innerHTML = '⏳ Cargando ventas desde Sheets…';
@@ -653,6 +704,8 @@ function responderEAN(ean, estado){
 
 cargar(true);
 cargarVentasDesdeSheets();
+cargarArticulosDesdeSheets();
+cargarStockDesdeSheets();
 setInterval(()=>{
   const activo=document.activeElement;
   if(activo&&activo.classList.contains('obs-input'))return;
