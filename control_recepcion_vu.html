@@ -355,12 +355,13 @@ function pollIncidencias(){
       .then(data=>{
         let cambio=false;
         eanPendientes.forEach(p=>{
-          const eanData=data.find(d=>String(d.ean)===String(p.ean)&&d.estado!=='PENDIENTE');
+          const eanData=data.find(d=>String(d.ean).trim()===String(p.ean).trim()&&d.estado!=='PENDIENTE');
           if(eanData){
             try{
               const key='hist_'+fechaHoyStr.replace(/\//g,'_');
               const items2=JSON.parse(localStorage.getItem(key)||'[]');
-              const idx=items2.findIndex(i=>String(i.id)===String(p.id));
+              // Buscar por EAN (no por id, porque el id local es timestamp distinto al de Sheets)
+              const idx=items2.findIndex(i=>String(i.ean).trim()===String(p.ean).trim()&&i.resultado==='EAN DESCONOCIDO');
               if(idx>=0){
                 items2[idx].estadoEAN=eanData.estado;
                 items2[idx].obsEAN=eanData.observacion||'';
