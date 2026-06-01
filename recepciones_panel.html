@@ -682,9 +682,21 @@ function cargarStock(input){
       for(const ean in ART){
         if(stockData[ean]!==undefined) ART[ean].stock=stockData[ean];
       }
-      document.getElementById('stock-status').textContent='✔ Stock actualizado: '+count+' artículos';
-      document.getElementById('stock-status').style.color='var(--green-text)';
+      document.getElementById('stock-status').innerHTML='<span style="color:var(--muted)">⏳ Guardando stock en Sheets...</span>';
       input.value='';
+      // Enviar a Sheets en lotes de 500
+      const stockArray=Object.entries(stockData).map(([ean,stock])=>({ean,stock}));
+      async function enviarStockLotes(){
+        const CHUNK=500;
+        for(let i=0;i<stockArray.length;i+=CHUNK){
+          const lote=stockArray.slice(i,i+CHUNK);
+          await fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'guardar_stock',stock:lote,limpiar:i===0})});
+        }
+        document.getElementById('stock-status').innerHTML='<span style="color:var(--green-text)">✔ Stock actualizado: '+count+' artículos — guardado en Sheets ✔</span>';
+      }
+      enviarStockLotes().catch(()=>{
+        document.getElementById('stock-status').innerHTML='<span style="color:var(--green-text)">✔ Stock actualizado: '+count+' artículos (error al guardar en Sheets)</span>';
+      });
     }catch(err){
       document.getElementById('stock-status').textContent='⚠ Error al leer archivo';
       document.getElementById('stock-status').style.color='var(--red-text)';
