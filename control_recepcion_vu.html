@@ -283,10 +283,9 @@ function renderHistorial(){
       else if(d.estadoEAN==='RECHAZADA'){estadoClass='rechazada';estadoText='✘ Recepciones: No lo trabajamos'+(d.obsEAN?' — '+d.obsEAN:'');}
       else{estadoClass='pendiente';estadoText='📢 EAN reportado — Esperando respuesta';}
     }
-    return `<div class="hist-item ${estadoClass}">
-      <div class="hist-desc" style="position:relative">
-      <button onclick="eliminarHistorial('${d.id}')" style="position:absolute;top:4px;right:4px;background:none;border:none;cursor:pointer;font-size:13px;color:#999;padding:2px 6px" title="Eliminar">✕</button>
-      <div class="hist-desc" style="padding-right:20px">${d.descripcion}</div>
+    return `<div class="hist-item ${estadoClass}" style="position:relative">
+      <button onclick="eliminarHistorial('${d.id}')" style="position:absolute;top:6px;right:6px;background:none;border:none;cursor:pointer;font-size:13px;color:#999;padding:2px 6px" title="Eliminar">✕</button>
+      <div class="hist-desc" style="padding-right:24px">${d.descripcion}</div>
       <div class="hist-meta">Vto: ${d.fecha_vto} | Días: ${d.dias} | Cant: ${d.cantidad||'–'}</div>
       <div class="hist-estado ${estadoClass}">${estadoText}</div>
     </div>`;
