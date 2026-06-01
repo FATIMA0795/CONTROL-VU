@@ -594,7 +594,7 @@ function enviarBandeja(){
   if(bandeja.length===0)return;
   const btn=document.querySelector('.btn-enviar-bandeja');
   btn.textContent='Enviando…';btn.disabled=true;
-  // Enviar todas las incidencias una por una
+  // Enviar todas las incidencias independientemente (si una falla no afecta a las demás)
   const promesas=bandeja.map(item=>
     fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({
       accion:'nueva',fecha:fechaHoyStr,
@@ -612,17 +612,22 @@ function enviarBandeja(){
       };
       guardarLocal(histItem);
     })
+    .catch(()=>{
+      // Si falla una, igual guardamos localmente con incidenciaId vacío para reintento
+      const histItem={
+        id:Date.now()+Math.random(),ean:item.ean,descripcion:item.descripcion,marca:item.marca,
+        fecha_vto:item.fecha_vto,dias:item.dias,cantidad:item.cantidad,
+        resultado:'FECHA CORTA',incidenciaId:'',estado:'PENDIENTE'
+      };
+      guardarLocal(histItem);
+    })
   );
-  Promise.all(promesas).then(()=>{
+  Promise.allSettled(promesas).then(()=>{
     bandeja=[];
     renderBandeja();
     renderHistorial();
     btn.textContent='📢 Enviar todas las incidencias a Recepciones';
     btn.disabled=false;
-  }).catch(()=>{
-    btn.textContent='📢 Enviar todas las incidencias a Recepciones';
-    btn.disabled=false;
-    alert('Error al enviar. Intentá de nuevo.');
   });
 }
 
@@ -637,27 +642,21 @@ function reportarEAN(){
   const btn=document.querySelector('.btn-report');
   btn.textContent='Enviando…';btn.disabled=true;
   const cantidad=document.getElementById('nf-cantidad')?document.getElementById('nf-cantidad').value||'':'';
+  // Guardar localmente primero sin esperar al servidor
+  const id=Date.now();
+  guardarLocal({id,ean,descripcion:desc,marca,fecha_vto:'–',dias:'–',cantidad:cantidad||'–',resultado:'EAN DESCONOCIDO'});
+  renderHistorial();
+  document.getElementById('report-ok').classList.add('visible');
+  // Enviar al servidor en segundo plano
   fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({
     accion:'ean_desconocido',fecha:fechaHoyStr,ean,descripcion:desc,marca,cantidad
-  })})
-  .then(()=>{
-    // Guardar en historial local
-    const id=Date.now();
-    guardarLocal({id,ean,descripcion:desc,marca,fecha_vto:'–',dias:'–',cantidad:cantidad||'–',resultado:'EAN DESCONOCIDO'});
-    renderHistorial();
-    document.getElementById('report-ok').classList.add('visible');
-    setTimeout(()=>{
-      document.getElementById('ean').value='';
-      resetResult();
-      focoEAN();
-      reportandoEAN=false;
-    },2000);
-  }).catch(()=>{
-    alert('Error al reportar.');
+  })}).catch(()=>{});
+  setTimeout(()=>{
+    document.getElementById('ean').value='';
+    resetResult();
+    focoEAN();
     reportandoEAN=false;
-    btn.textContent='📢 Reportar a Recepciones';
-    btn.disabled=false;
-  });
+  },1500);
 }
 </script>
 </body>
