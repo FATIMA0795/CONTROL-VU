@@ -408,6 +408,7 @@ function renderInc(inc,pendiente){
   const fechaStr = inc.fecha ? String(inc.fecha).split('T')[0] : '';
   const cantStr = inc.cantidad ? `<div class="dato warn"><div class="dato-label">Cant. fecha corta</div><div class="dato-val">${inc.cantidad}</div><div class="dato-unit">unidades</div></div>` : '';
 
+  const stockChip = stock !== null ? `<div class="dato"><div class="dato-label">Stock actual</div><div class="dato-val">${stock}</div><div class="dato-unit">unidades</div></div>` : '';
   const ventaStr = ventaSem !== null ? `<div class="dato"><div class="dato-label">Venta semanal</div><div class="dato-val">${ventaSem}</div><div class="dato-unit">u/semana prom.</div></div>` : '';
   const acciones = pendiente ? `
     <div class="acciones">
