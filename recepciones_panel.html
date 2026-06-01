@@ -120,6 +120,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="stat aceptada"><div class="stat-val" id="cnt-aceptada">–</div><div class="stat-label">Aceptadas</div></div>
     <div class="stat rechazada"><div class="stat-val" id="cnt-rechazada">–</div><div class="stat-label">Rechazadas</div></div>
   </div>
+  <!-- FILTROS DE CONSERVA -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
+    <span style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-right:4px">Filtrar:</span>
+    <button onclick="setFiltroConserva('TODOS')" id="filtro-TODOS" style="height:30px;padding:0 14px;border-radius:20px;border:1px solid var(--border);background:var(--accent);color:#fff;font-size:12px;font-weight:600;cursor:pointer">Todos</button>
+    <button onclick="setFiltroConserva('SECO')" id="filtro-SECO" style="height:30px;padding:0 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:600;cursor:pointer">🌾 Seco</button>
+    <button onclick="setFiltroConserva('COSMETICA')" id="filtro-COSMETICA" style="height:30px;padding:0 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:600;cursor:pointer">💄 Cosmética</button>
+    <button onclick="setFiltroConserva('CONGELADO')" id="filtro-CONGELADO" style="height:30px;padding:0 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:600;cursor:pointer">❄️ Congelado</button>
+    <button onclick="setFiltroConserva('REFRIGERADO')" id="filtro-REFRIGERADO" style="height:30px;padding:0 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:600;cursor:pointer">🧊 Refrigerado</button>
+    <button onclick="setFiltroConserva('CHOCOLATES')" id="filtro-CHOCOLATES" style="height:30px;padding:0 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:600;cursor:pointer">🍫 Chocolates</button>
+  </div>
   <div class="seccion-titulo">⏳ Incidencias Pendientes</div>
   <div class="incidencias" id="pendientes"><div class="loading">Cargando…</div></div>
   <div class="seccion-titulo">📋 Historial de Incidencias</div>
@@ -138,6 +148,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.8px">Stock del día (Excel de Maer)</div>
         <input type="file" accept=".xlsx,.xls" onchange="cargarStock(this)" style="font-size:12px;color:var(--muted);width:100%;margin-bottom:4px"/>
         <div id="stock-status" style="font-size:11px;color:var(--muted)">Sin actualizar</div>
+      </div>
+      <div style="flex:1;min-width:200px">
+        <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.8px">Artículos + Conserva (Excel de Maer)</div>
+        <input type="file" accept=".xlsx,.xls" onchange="cargarArticulos(this)" style="font-size:12px;color:var(--muted);width:100%;margin-bottom:4px"/>
+        <div id="articulos-status" style="font-size:11px;color:var(--muted)">Sin actualizar</div>
       </div>
       <div style="flex:1;min-width:200px">
         <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.8px">Ventas semanales</div>
@@ -320,29 +335,24 @@ function cargar(manual){
     const el=document.getElementById('ean-desconocidos');
     if(!el)return;
     const hoyStr2=new Date().toISOString().substring(0,10);
-    const todosHoy=data.filter(d=>String(d.fecha).substring(0,10)===hoyStr2);
-    if(todosHoy.length===0){el.innerHTML='<div class="empty">Sin EAN desconocidos hoy</div>';return;}
-    const pendientesEAN=todosHoy.filter(d=>d.estado==='PENDIENTE');
-    const respondidosEAN=todosHoy.filter(d=>d.estado!=='PENDIENTE');
-    el.innerHTML=[...pendientesEAN,...respondidosEAN].map(d=>{
-      const esPend=d.estado==='PENDIENTE';
-      return `
-      <div class="inc ${esPend?'pendiente':d.estado}" id="ean_${d.ean}">
+    const pendientes=data.filter(d=>d.estado==='PENDIENTE'&&String(d.fecha).substring(0,10)===hoyStr2);
+    if(pendientes.length===0){el.innerHTML='<div class="empty">Sin EAN desconocidos pendientes</div>';return;}
+    el.innerHTML=pendientes.map(d=>`
+      <div class="inc pendiente" id="ean_${d.ean}">
         <div class="inc-header">
           <div>
             <div class="inc-marca">${d.marca||'Sin marca'}</div>
             <div class="inc-desc">${d.descripcion||'Sin descripción'}</div>
             <div class="inc-meta">EAN: ${d.ean} &nbsp;|&nbsp; Reportado: ${String(d.fecha).split('T')[0]}</div>
           </div>
-          <div class="badge ${esPend?'pendiente':d.estado}">${esPend?'PENDIENTE':d.estado}</div>
+          <div class="badge pendiente">PENDIENTE</div>
         </div>
-        ${esPend ? `<div class="acciones">
+        <div class="acciones">
           <input type="text" class="obs-input" id="obs_ean_${d.ean}" placeholder="Observación (opcional)…" />
           <button class="btn-aceptar" onclick="responderEAN('${d.ean}','ACEPTADA')">✔ Lo trabajamos</button>
           <button class="btn-rechazar" onclick="responderEAN('${d.ean}','RECHAZADA')">✘ No lo trabajamos</button>
-        </div>` : `<div class="respuesta-dada">💬 ${d.observacion||''}</div>`}
-      </div>`;
-    }).join('');
+        </div>
+      </div>`).join('');
   }).catch(()=>{
     const el=document.getElementById('ean-desconocidos');
     if(el)el.innerHTML='<div class="empty">Error al cargar EAN desconocidos.</div>';
@@ -351,7 +361,19 @@ function cargar(manual){
 
 function renderIncidencias(data){
   // Pendientes e EN CONSULTA: mostrar todas sin filtro de fecha
-  const pendientes=data.filter(d=>d.estado==='PENDIENTE'||d.estado==='EN CONSULTA');
+  // Aplicar filtro de conserva
+  const pendientesTodos=data.filter(d=>d.estado==='PENDIENTE'||d.estado==='EN CONSULTA');
+  const pendientes = filtroConserva==='TODOS' ? pendientesTodos : pendientesTodos.filter(d=>{
+    const art=ART[String(d.ean)];
+    if(!art||!art.conserva) return filtroConserva==='SECO'; // sin conserva definida va a SECO
+    const c=art.conserva.toUpperCase();
+    if(filtroConserva==='SECO') return c.includes('SECO');
+    if(filtroConserva==='COSMETICA') return c.includes('COSM');
+    if(filtroConserva==='CONGELADO') return c.includes('CONGELADO');
+    if(filtroConserva==='REFRIGERADO') return c.includes('REFRIGERADO');
+    if(filtroConserva==='CHOCOLATES') return c.includes('CHOCOLATE') || c.includes('DULCE');
+    return true;
+  });
   // Historial: solo de hoy
   const hoyLocal = new Date();
   hoyLocal.setHours(0,0,0,0);
@@ -387,10 +409,6 @@ function renderInc(inc,pendiente){
   const cantStr = inc.cantidad ? `<div class="dato warn"><div class="dato-label">Cant. fecha corta</div><div class="dato-val">${inc.cantidad}</div><div class="dato-unit">unidades</div></div>` : '';
 
   const ventaStr = ventaSem !== null ? `<div class="dato"><div class="dato-label">Venta semanal</div><div class="dato-val">${ventaSem}</div><div class="dato-unit">u/semana prom.</div></div>` : '';
-  const stockMaerVal = art && art.stock !== null ? art.stock : null;
-  const cantIngresa = parseInt(inc.cantidad) || 0;
-  const stockSimVal = stockMaerVal !== null ? stockMaerVal + cantIngresa : null;
-  const stockChip = stockSimVal !== null ? `<div class="dato" style="background:#e3f2fd;border-color:#1565c0"><div class="dato-label">Stock Maer + ingresando</div><div class="dato-val" style="font-size:16px">${stockMaerVal} + ${cantIngresa} = ${stockSimVal}</div><div class="dato-unit">u. simulado</div></div>` : '';
   const acciones = pendiente ? `
     <div class="acciones">
       <input type="text" class="obs-input" id="obs_${inc.id}" placeholder="Observación (opcional)…" />
@@ -437,6 +455,60 @@ function responder(id,estado){
 }
 
 // ACTUALIZAR STOCK Y VENTAS
+// FILTRO DE CONSERVA
+let filtroConserva = 'TODOS';
+
+function setFiltroConserva(val){
+  filtroConserva = val;
+  // Actualizar botones
+  ['TODOS','SECO','COSMETICA','CONGELADO','REFRIGERADO','CHOCOLATES'].forEach(k=>{
+    const btn = document.getElementById('filtro-'+k);
+    if(!btn) return;
+    if(k===val){
+      btn.style.background='var(--accent)';
+      btn.style.color='#fff';
+    } else {
+      btn.style.background='var(--surface)';
+      btn.style.color='var(--text)';
+    }
+  });
+  if(ultimosDatos.length>0) renderIncidencias(ultimosDatos);
+}
+
+// CARGAR ARTÍCULOS (con conserva)
+function cargarArticulos(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws);
+      let count=0;
+      for(const row of rows){
+        // Columna Cód Barras del archivo de artículos
+        const ean=String(row['Cód Barras']||row['Cod Barras']||row['CodBarras']||row['EAN']||row['ean']||'').trim();
+        const conservaRaw=String(row['Conservación']||row['Conservacion']||row['conservacion']||'').split(' - ')[0].trim().toUpperCase();
+        const vu=parseInt(row['Vida Util']||row['VU']||row['vu']||0);
+        if(ean){
+          ART[ean]=ART[ean]||{};
+          if(conservaRaw) ART[ean].conserva=conservaRaw;
+          if(vu) ART[ean].vu=vu;
+          if(row['Descripción']||row['Descripcion']) ART[ean].desc=String(row['Descripción']||row['Descripcion']||'');
+          if(row['Marca']||row['marca']) ART[ean].marca=String(row['Marca']||row['marca']||'');
+          count++;
+        }
+      }
+      document.getElementById('articulos-status').innerHTML='<span style="color:var(--green-text)">✔ Artículos actualizados: '+count+' registros</span>';
+      input.value='';
+    }catch(err){
+      document.getElementById('articulos-status').innerHTML='<span style="color:var(--red-text)">⚠ Error al leer archivo</span>';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
 function cargarStock(input){
   const file=input.files[0];
   if(!file)return;
