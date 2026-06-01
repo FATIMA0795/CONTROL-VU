@@ -500,13 +500,19 @@ function cargarArticulos(input){
           count++;
         }
       }
-      document.getElementById('articulos-status').innerHTML='<span style="color:var(--muted)">⏳ Guardando en Sheets...</span>';
-      // Enviar a Sheets
+      document.getElementById('articulos-status').innerHTML='<span style="color:var(--muted)">⏳ Guardando en Sheets (puede tardar unos segundos)...</span>';
+      // Enviar a Sheets en lotes de 500
       const artArray = Object.entries(ART).map(([ean,v])=>({ean,desc:v.desc||'',marca:v.marca||'',vu:v.vu||0,vu_min:v.vu_min||0,conserva:v.conserva||''}));
-      fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'guardar_articulos',articulos:artArray})})
-      .then(r=>r.json())
-      .then(()=>{document.getElementById('articulos-status').innerHTML='<span style="color:var(--green-text)">✔ Artículos actualizados: '+count+' registros — guardados en Sheets</span>';})
-      .catch(()=>{document.getElementById('articulos-status').innerHTML='<span style="color:var(--green-text)">✔ Artículos actualizados: '+count+' registros (sin guardar en Sheets)</span>';});
+      const CHUNK = 500;
+      async function enviarArticulosEnLotes(){
+        for(let i=0;i<artArray.length;i+=CHUNK){
+          const lote=artArray.slice(i,i+CHUNK);
+          const esPrimero=(i===0);
+          await fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'guardar_articulos',articulos:lote,limpiar:esPrimero})});
+        }
+        document.getElementById('articulos-status').innerHTML='<span style="color:var(--green-text)">✔ Artículos actualizados: '+count+' registros — guardados en Sheets ✔</span>';
+      }
+      enviarArticulosEnLotes().catch(()=>{document.getElementById('articulos-status').innerHTML='<span style="color:var(--green-text)">✔ Artículos actualizados: '+count+' registros (error al guardar en Sheets)</span>';});
       input.value='';
     }catch(err){
       document.getElementById('articulos-status').innerHTML='<span style="color:var(--red-text)">⚠ Error al leer archivo</span>';
@@ -531,12 +537,18 @@ function cargarStock(input){
         if(ean){ART[ean]=ART[ean]||{};ART[ean].stock=disp;count++;}
       }
       document.getElementById('stock-status').innerHTML='<span style="color:var(--muted)">⏳ Guardando stock en Sheets...</span>';
-      // Enviar stock a Sheets
+      // Enviar stock a Sheets en lotes de 500
       const stockArray = Object.entries(ART).filter(([e,v])=>v.stock!==undefined).map(([ean,v])=>({ean,stock:v.stock}));
-      fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'guardar_stock',stock:stockArray})})
-      .then(r=>r.json())
-      .then(()=>{document.getElementById('stock-status').innerHTML='<span style="color:var(--green-text)">✔ Stock actualizado: '+count+' artículos — guardado en Sheets</span>';})
-      .catch(()=>{document.getElementById('stock-status').innerHTML='<span style="color:var(--green-text)">✔ Stock actualizado: '+count+' artículos (sin guardar en Sheets)</span>';});
+      async function enviarStockEnLotes(){
+        const CHUNK2=500;
+        for(let i=0;i<stockArray.length;i+=CHUNK2){
+          const lote=stockArray.slice(i,i+CHUNK2);
+          const esPrimero=(i===0);
+          await fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'guardar_stock',stock:lote,limpiar:esPrimero})});
+        }
+        document.getElementById('stock-status').innerHTML='<span style="color:var(--green-text)">✔ Stock actualizado: '+count+' artículos — guardado en Sheets ✔</span>';
+      }
+      enviarStockEnLotes().catch(()=>{document.getElementById('stock-status').innerHTML='<span style="color:var(--green-text)">✔ Stock actualizado: '+count+' artículos (error al guardar en Sheets)</span>';});
       input.value='';
     }catch(err){
       document.getElementById('stock-status').innerHTML='<span style="color:var(--red-text)">⚠ Error al leer archivo</span>';
