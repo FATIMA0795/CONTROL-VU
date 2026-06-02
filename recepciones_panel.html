@@ -499,16 +499,21 @@ function cargarArticulos(input){
       const rows=XLSX.utils.sheet_to_json(ws);
       let count=0;
       for(const row of rows){
-        // Columna Cód Barras del archivo de artículos
-        const ean=String(row['Cód Barras']||row['Cod Barras']||row['CodBarras']||row['EAN']||row['ean']||'').trim();
-        const conservaRaw=String(row['Conservación']||row['Conservacion']||row['conservacion']||'').split(' - ')[0].trim().toUpperCase();
-        const vu=parseInt(row['Vida Util']||row['VU']||row['vu']||0);
+        // Normalizar keys del row para evitar problemas de mayúsculas/minúsculas/tildes
+        const rowNorm={};
+        for(const k in row){ rowNorm[k.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')]=row[k]; }
+        const ean=String(rowNorm['cod barras']||rowNorm['codbarras']||rowNorm['ean']||rowNorm['cod_barras']||'').trim();
+        const conservaRaw=String(rowNorm['conservacion']||'').split(' - ')[0].replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ]/g,'').trim().toUpperCase();
+        // vu se calcula abajo con rowNorm
+        const vu2=parseInt(rowNorm['vida util']||rowNorm['vu']||rowNorm['vida_util']||0);
+        const desc2=String(rowNorm['descripcion']||rowNorm['descripción']||'');
+        const marca2=String(rowNorm['marca']||'');
         if(ean){
           ART[ean]=ART[ean]||{};
           if(conservaRaw) ART[ean].conserva=conservaRaw;
-          if(vu) ART[ean].vu=vu;
-          if(row['Descripción']||row['Descripcion']) ART[ean].desc=String(row['Descripción']||row['Descripcion']||'');
-          if(row['Marca']||row['marca']) ART[ean].marca=String(row['Marca']||row['marca']||'');
+          if(vu2) ART[ean].vu=vu2;
+          if(desc2) ART[ean].desc=desc2;
+          if(marca2) ART[ean].marca=marca2;
           count++;
         }
       }
@@ -523,6 +528,7 @@ function cargarArticulos(input){
           await fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'guardar_articulos',articulos:lote,limpiar:esPrimero})});
         }
         document.getElementById('articulos-status').innerHTML='<span style="color:var(--green-text)">✔ Artículos actualizados: '+count+' registros — guardados en Sheets ✔</span>';
+        if(ultimosDatos.length>0) renderIncidencias(ultimosDatos);
       }
       enviarArticulosEnLotes().catch(()=>{document.getElementById('articulos-status').innerHTML='<span style="color:var(--green-text)">✔ Artículos actualizados: '+count+' registros (error al guardar en Sheets)</span>';});
       input.value='';
