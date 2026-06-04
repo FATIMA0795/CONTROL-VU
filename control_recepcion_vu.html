@@ -87,6 +87,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .ean-form input{width:100%;height:40px;border:1.5px solid var(--border);border-radius:8px;padding:0 12px;font-size:14px;background:var(--bg);outline:none;margin-bottom:8px}
 .ean-form input:focus{border-color:var(--accent);background:#fff}
 .btn-report{background:var(--orange-text);color:#fff;width:100%;height:42px;border-radius:8px;border:none;cursor:pointer;font-size:14px;font-weight:700}
+.btn-cambios{background:#6366f1;color:#fff;width:100%;height:42px;border-radius:8px;border:none;cursor:pointer;font-size:14px;font-weight:700;margin-top:8px}
+.btn-cambios:active{opacity:.85}
+.modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center}
+.modal-overlay.visible{display:flex}
+.modal-box{background:#fff;border-radius:16px;padding:20px;width:calc(100% - 40px);max-width:420px;max-height:85vh;overflow-y:auto}
+.modal-title{font-size:16px;font-weight:700;color:var(--text);margin-bottom:16px}
+.modal-campo{margin-bottom:14px}
+.modal-campo-label{font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px}
+.modal-toggle{display:flex;gap:8px;margin-bottom:8px}
+.modal-toggle button{flex:1;height:36px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer}
+.modal-toggle button.active-si{background:#d1fae5;border-color:#059669;color:#065f46}
+.modal-toggle button.active-no{background:#fee2e2;border-color:#dc2626;color:#991b1b}
+.modal-subinput{width:100%;height:38px;border-radius:8px;border:1.5px solid var(--border);padding:0 10px;font-size:13px;box-sizing:border-box;display:none}
+.modal-subinput.visible{display:block}
+.modal-btns{display:flex;gap:8px;margin-top:18px}
+.modal-btns button{flex:1;height:44px;border-radius:8px;border:none;font-size:14px;font-weight:700;cursor:pointer}
+.btn-modal-cancelar{background:var(--border);color:var(--muted)}
+.btn-modal-enviar{background:#6366f1;color:#fff}
+.modal-ok{text-align:center;font-size:13px;color:#059669;font-weight:600;margin-top:10px;display:none}
 .report-ok{background:var(--green-bg);border:1px solid var(--green-border);border-radius:8px;padding:10px;font-size:13px;color:var(--green-text);font-weight:600;text-align:center;display:none;margin-top:8px}
 .report-ok.visible{display:block}
 
@@ -164,9 +183,50 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
             <span class="cant-label">unidades recibidas</span>
           </div>
           <button class="btn-confirmar" onclick="confirmarRecepcion()">✔ Confirmar recepción</button>
+          <button class="btn-cambios" onclick="abrirModalCambios()" id="btn-cambios" style="display:none">📝 Reportar cambios</button>
           <button class="btn-red" id="btn-incidencia" onclick="avisarIncidencia()" style="display:none">⚠ Avisar incidencia a Recepciones</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- MODAL REPORTAR CAMBIOS -->
+  <div class="modal-overlay" id="modal-cambios">
+    <div class="modal-box">
+      <div class="modal-title">📝 Reportar cambios en el producto</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px" id="modal-art-info"></div>
+
+      <div class="modal-campo">
+        <div class="modal-campo-label">¿Cambió el packaging?</div>
+        <div class="modal-toggle">
+          <button id="pkg-si" onclick="toggleCambio('pkg','SI')">Sí</button>
+          <button id="pkg-no" onclick="toggleCambio('pkg','NO')">No</button>
+        </div>
+      </div>
+
+      <div class="modal-campo">
+        <div class="modal-campo-label">¿Cambió el EAN?</div>
+        <div class="modal-toggle">
+          <button id="ean-si" onclick="toggleCambio('ean','SI')">Sí</button>
+          <button id="ean-no" onclick="toggleCambio('ean','NO')">No</button>
+        </div>
+        <input type="number" class="modal-subinput" id="nuevo-ean" placeholder="Nuevo EAN…" inputmode="numeric" />
+      </div>
+
+      <div class="modal-campo">
+        <div class="modal-campo-label">¿Cambió el gramaje?</div>
+        <div class="modal-toggle">
+          <button id="gram-si" onclick="toggleCambio('gram','SI')">Sí</button>
+          <button id="gram-no" onclick="toggleCambio('gram','NO')">No</button>
+        </div>
+        <input type="text" class="modal-subinput" id="nuevo-gramaje" placeholder="Nuevo gramaje… (ej: 500g)" />
+      </div>
+
+      <div class="modal-btns">
+        <button class="btn-modal-cancelar" onclick="cerrarModalCambios()">Cancelar</button>
+        <button class="btn-modal-enviar" onclick="enviarCambios()">📤 Enviar reporte</button>
+      </div>
+      <div class="modal-ok" id="modal-cambios-ok">✔ Reporte enviado correctamente</div>
     </div>
   </div>
 
@@ -456,6 +516,7 @@ document.getElementById('fecha-venc').addEventListener('input',function(){
   document.getElementById('fecha-error').classList.remove('visible');
   document.getElementById('veredictos').classList.remove('visible');
   document.getElementById('seccion-confirmar').style.display='none';
+  document.getElementById('btn-cambios').style.display='none';
   document.getElementById('ocr-status').textContent='';
 });
 document.getElementById('ean').addEventListener('keydown',e=>{if(e.key==='Enter')buscar();});
@@ -475,6 +536,7 @@ function resetResult(){
   document.getElementById('veredictos').classList.remove('visible');
   document.getElementById('fecha-error').classList.remove('visible');
   document.getElementById('seccion-confirmar').style.display='none';
+  document.getElementById('btn-cambios').style.display='none';
   document.getElementById('btn-incidencia').style.display='none';
   document.getElementById('fecha-venc').value='';
   document.getElementById('ocr-status').textContent='';
@@ -531,6 +593,7 @@ function verificar(){
 
   document.getElementById('veredictos').classList.add('visible');
   document.getElementById('seccion-confirmar').style.display='block';
+  document.getElementById('btn-cambios').style.display='block';
   document.getElementById('btn-incidencia').style.display=hayRechazo?'block':'none';
   setTimeout(()=>document.getElementById('cantidad').focus(),150);
 }
@@ -632,6 +695,87 @@ function enviarBandeja(){
 }
 
 let reportandoEAN = false;
+// ─── REPORTAR CAMBIOS ────────────────────────────────────────────────────────
+let cambiosEstado = { pkg: null, ean: null, gram: null };
+let eanActualParaCambio = '';
+let descActualParaCambio = '';
+let marcaActualParaCambio = '';
+
+function abrirModalCambios(){
+  const ean = document.getElementById('art-ean').textContent.replace('EAN: ','').trim();
+  const desc = document.getElementById('art-desc').textContent.trim();
+  const marca = document.getElementById('art-marca').textContent.trim();
+  eanActualParaCambio = ean;
+  descActualParaCambio = desc;
+  marcaActualParaCambio = marca;
+  document.getElementById('modal-art-info').textContent = marca + ' — ' + desc + ' (EAN: ' + ean + ')';
+  // Reset estado
+  cambiosEstado = { pkg: null, ean: null, gram: null };
+  ['pkg-si','pkg-no','ean-si','ean-no','gram-si','gram-no'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el){ el.className = ''; }
+  });
+  document.getElementById('nuevo-ean').value = '';
+  document.getElementById('nuevo-gramaje').value = '';
+  document.getElementById('nuevo-ean').className = 'modal-subinput';
+  document.getElementById('nuevo-gramaje').className = 'modal-subinput';
+  document.getElementById('modal-cambios-ok').style.display = 'none';
+  document.getElementById('modal-cambios').classList.add('visible');
+}
+
+function cerrarModalCambios(){
+  document.getElementById('modal-cambios').classList.remove('visible');
+}
+
+function toggleCambio(campo, valor){
+  cambiosEstado[campo] = valor;
+  const si = document.getElementById(campo+'-si');
+  const no = document.getElementById(campo+'-no');
+  si.className = valor==='SI' ? 'active-si' : '';
+  no.className = valor==='NO' ? 'active-no' : '';
+  // Mostrar/ocultar subinput
+  if(campo === 'ean'){
+    document.getElementById('nuevo-ean').className = 'modal-subinput' + (valor==='SI' ? ' visible' : '');
+  }
+  if(campo === 'gram'){
+    document.getElementById('nuevo-gramaje').className = 'modal-subinput' + (valor==='SI' ? ' visible' : '');
+  }
+}
+
+function enviarCambios(){
+  if(!cambiosEstado.pkg && !cambiosEstado.ean && !cambiosEstado.gram){
+    alert('Seleccioná al menos una opción.');
+    return;
+  }
+  const nuevoEan = document.getElementById('nuevo-ean').value.trim();
+  const nuevoGramaje = document.getElementById('nuevo-gramaje').value.trim();
+  if(cambiosEstado.ean === 'SI' && !nuevoEan){
+    alert('Ingresá el nuevo EAN.');
+    return;
+  }
+  if(cambiosEstado.gram === 'SI' && !nuevoGramaje){
+    alert('Ingresá el nuevo gramaje.');
+    return;
+  }
+  const payload = {
+    accion: 'reportar_cambio',
+    fecha: fechaHoyStr,
+    ean: eanActualParaCambio,
+    descripcion: descActualParaCambio,
+    marca: marcaActualParaCambio,
+    cambio_packaging: cambiosEstado.pkg || 'NO',
+    cambio_ean: cambiosEstado.ean || 'NO',
+    nuevo_ean: nuevoEan || '',
+    cambio_gramaje: cambiosEstado.gram || 'NO',
+    nuevo_gramaje: nuevoGramaje || ''
+  };
+  // Enviar en segundo plano
+  fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) }).catch(()=>{});
+  document.getElementById('modal-cambios-ok').style.display = 'block';
+  setTimeout(()=>{ cerrarModalCambios(); }, 1800);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function reportarEAN(){
   if(reportandoEAN)return;
   const ean=document.getElementById('ean').value.trim();
