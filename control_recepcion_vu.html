@@ -260,7 +260,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
 <script>
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwhPfnvhA1dimrZryi7tq9yngiKS_uQGGPkex7-C5WmYoOJFKmu6B06snyIoOmUe2odMA/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbySL80I_kKPNJ6F8fJ6d__lWI0FXoUra7nB5apkfDlee39vNR7T33g0jhKKZl2MmIfD1Q/exec";
 let A = {};
 let catalogoCargado = false;
 
@@ -695,6 +695,41 @@ function enviarBandeja(){
 }
 
 let reportandoEAN = false;
+// ─── POLLING CAMBIOS REPORTADOS ──────────────────────────────────────────────
+function pollCambios(){
+  const key='cambios_'+fechaHoyStr.replace(/\//g,'_');
+  const pendientes=JSON.parse(localStorage.getItem(key)||'[]').filter(c=>!c.estado||c.estado==='PENDIENTE');
+  if(pendientes.length===0) return;
+  fetch(SCRIPT_URL+'?tipo=cambios_reportados&t='+Date.now())
+  .then(r=>r.json())
+  .then(data=>{
+    let cambio=false;
+    pendientes.forEach(p=>{
+      const found=data.find(d=>String(d.id)===String(p.id)&&d.estado!=='PENDIENTE');
+      if(found){
+        const items=JSON.parse(localStorage.getItem(key)||'[]');
+        const idx=items.findIndex(i=>String(i.id)===String(p.id));
+        if(idx>=0){ items[idx].estado=found.estado; localStorage.setItem(key,JSON.stringify(items)); cambio=true; }
+      }
+    });
+    if(cambio) renderHistorialCambios();
+  }).catch(()=>{});
+}
+setInterval(pollCambios,4000);
+
+function renderHistorialCambios(){
+  // Actualizar visualmente los cambios en el historial si los hay
+  const key='cambios_'+fechaHoyStr.replace(/\//g,'_');
+  const items=JSON.parse(localStorage.getItem(key)||'[]');
+  items.forEach(c=>{
+    const el=document.getElementById('cambio_local_'+c.id);
+    if(el && c.estado && c.estado!=='PENDIENTE'){
+      el.innerHTML='<span style="color:'+(c.estado==='ACEPTADO'?'#059669':'#dc2626')+';font-weight:700">'+(c.estado==='ACEPTADO'?'✔ Recepciones: Aceptado, avisan al área':'✘ Recepciones: Rechazado, no lo trabajamos')+'</span>';
+    }
+  });
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ─── REPORTAR CAMBIOS ────────────────────────────────────────────────────────
 let cambiosEstado = { pkg: null, ean: null, gram: null };
 let eanActualParaCambio = '';
@@ -757,8 +792,10 @@ function enviarCambios(){
     alert('Ingresá el nuevo gramaje.');
     return;
   }
+  const cambioId = Date.now();
   const payload = {
     accion: 'reportar_cambio',
+    id: cambioId,
     fecha: fechaHoyStr,
     ean: eanActualParaCambio,
     descripcion: descActualParaCambio,
@@ -769,6 +806,11 @@ function enviarCambios(){
     cambio_gramaje: cambiosEstado.gram || 'NO',
     nuevo_gramaje: nuevoGramaje || ''
   };
+  // Guardar en localStorage para polling
+  const keyC='cambios_'+fechaHoyStr.replace(/\//g,'_');
+  const cambiosLocal=JSON.parse(localStorage.getItem(keyC)||'[]');
+  cambiosLocal.push({id:cambioId, ean:eanActualParaCambio, estado:'PENDIENTE'});
+  localStorage.setItem(keyC, JSON.stringify(cambiosLocal));
   // Enviar en segundo plano
   fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) }).catch(()=>{});
   document.getElementById('modal-cambios-ok').style.display = 'block';
