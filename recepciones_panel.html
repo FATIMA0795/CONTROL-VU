@@ -338,8 +338,13 @@ function cargar(manual){
   .then(data=>{
     const el=document.getElementById('cambios-reportados');
     if(!el)return;
+    const hoyDate3=new Date();
     const hoyStr3=new Date().toISOString().substring(0,10);
-    const deHoy3=data.filter(d=>String(d.fecha).substring(0,10)===hoyStr3);
+    const hoyStr3Alt=String(hoyDate3.getDate()).padStart(2,'0')+'/'+String(hoyDate3.getMonth()+1).padStart(2,'0')+'/'+hoyDate3.getFullYear();
+    const deHoy3=data.filter(d=>{
+      const f=String(d.fecha);
+      return f.substring(0,10)===hoyStr3 || f===hoyStr3Alt || f.startsWith(hoyStr3Alt);
+    });
     if(deHoy3.length===0){el.innerHTML='<div class="empty">Sin cambios reportados hoy</div>';return;}
     el.innerHTML=deHoy3.map(d=>{
       const esPendiente=d.estado==='PENDIENTE'||!d.estado;
