@@ -323,7 +323,11 @@ function guardarNombreOperario(val){
 function initNombreOperario(){
   const nombre = getNombreOperario();
   const input = document.getElementById('nombre-operario');
-  if(input) input.value = nombre;
+  if(input){
+    input.value = nombre;
+    // Forzar guardado para asegurar que está en localStorage
+    if(nombre) localStorage.setItem('nombre_operario', nombre);
+  }
 }
 // ───────────────────────────────────────────────────────────────────────────
 document.getElementById('hoy').textContent=fechaHoyStr;
@@ -384,6 +388,7 @@ function renderHistorial(){
   }).join('');
 }
 renderHistorial();
+initNombreOperario();
 
 function eliminarHistorial(id){
   try{
@@ -636,7 +641,9 @@ function confirmarRecepcion(){
   const resultado=hayRechazo?'FECHA CORTA':'OK';
   const id=Date.now();
   const item={id,ean:currentEAN,descripcion:art.desc,marca:art.marca,fecha_vto:fechaVtoActual,dias:diasActual,cantidad,resultado};
-  fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'registrar',fecha:fechaHoyStr,...item})})
+  const opNombre = document.getElementById('nombre-operario').value.trim() || getNombreOperario();
+  localStorage.setItem('nombre_operario', opNombre);
+  fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'registrar',fecha:fechaHoyStr,operario:opNombre,...item})})
   .then(()=>{guardarLocal(item);renderHistorial();document.getElementById('ean').value='';resetResult();focoEAN();})
   .catch(()=>alert('Error al guardar.'));
 }
@@ -670,7 +677,7 @@ function avisarIncidencia(){
   bandeja.push(item);
   // Registrar en historial como fecha corta
   fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({
-    accion:'registrar',fecha:fechaHoyStr,ean:currentEAN,
+    accion:'registrar',fecha:fechaHoyStr,operario:document.getElementById('nombre-operario').value.trim()||getNombreOperario(),ean:currentEAN,
     descripcion:art.desc,marca:art.marca,fecha_vto:fechaVtoActual,
     dias:diasActual,cantidad,resultado:'FECHA CORTA'
   })});
@@ -692,7 +699,7 @@ function enviarBandeja(){
   // Enviar todas las incidencias independientemente (si una falla no afecta a las demás)
   const promesas=bandeja.map(item=>
     fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({
-      accion:'nueva',fecha:fechaHoyStr,
+      accion:'nueva',fecha:fechaHoyStr,operario:document.getElementById('nombre-operario').value.trim()||getNombreOperario(),
       ean:item.ean,descripcion:item.descripcion,marca:item.marca,
       vu_orig:item.vu_orig,vu_min:item.vu_min,
       dias:item.dias,cantidad:item.cantidad
@@ -844,6 +851,7 @@ function enviarCambios(){
   const payload = {
     accion: 'reportar_cambio',
     id: cambioId,
+    operario: getNombreOperario(),
     fecha: fechaHoyStr,
     ean: eanActualParaCambio,
     descripcion: descActualParaCambio,
@@ -902,7 +910,7 @@ function reportarEAN(){
   document.getElementById('report-ok').classList.add('visible');
   // Enviar al servidor en segundo plano
   fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({
-    accion:'ean_desconocido',fecha:fechaHoyStr,ean,descripcion:desc,marca,cantidad
+    accion:'ean_desconocido',fecha:fechaHoyStr,ean,descripcion:desc,marca,cantidad,operario:getNombreOperario()
   })}).catch(()=>{});
   setTimeout(()=>{
     document.getElementById('ean').value='';
