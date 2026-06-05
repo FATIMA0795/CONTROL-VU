@@ -345,6 +345,11 @@ function renderHistorial(){
       else if(d.estado==='ACEPTADA'){estadoClass='aceptada';estadoText='✔ Recepciones acepta'+(d.obs?' — '+d.obs:'');}
       else if(d.estado==='RECHAZADA'){estadoClass='rechazada';estadoText='✘ Recepciones rechaza'+(d.obs?' — '+d.obs:'');}
       else{estadoClass='pendiente';estadoText='⏳ Esperando Recepciones';}
+    } else if(d.resultado==='CAMBIO REPORTADO'){
+      estadoClass='pendiente';
+      estadoText='📝 Cambio reportado: '+(d.detalleCambio||'')+' — ⏳ Esperando Recepciones';
+      if(d.estado==='ACEPTADO'){estadoClass='aceptada';estadoText='✔ Recepciones: Aceptado, avisan al área';}
+      else if(d.estado==='RECHAZADO'){estadoClass='rechazada';estadoText='✘ Recepciones: Rechazado, no lo trabajamos';}
     } else if(d.resultado==='FECHA CORTA'){estadoClass='corta';estadoText='✘ Fecha corta';}
     else if(d.resultado==='EAN DESCONOCIDO'){
       if(d.estadoEAN==='ACEPTADA'){estadoClass='aceptada';estadoText='✔ Recepciones: Lo trabajamos'+(d.obsEAN?' — '+d.obsEAN:'');}
@@ -845,6 +850,24 @@ function enviarCambios(){
   const cambiosLocal=JSON.parse(localStorage.getItem(keyC)||'[]');
   cambiosLocal.push({id:cambioId, ean:eanActualParaCambio, estado:'PENDIENTE'});
   localStorage.setItem(keyC, JSON.stringify(cambiosLocal));
+  // Guardar en historial local del colector
+  const detallesCambio=[];
+  if(cambiosEstado.pkg==='SI') detallesCambio.push('Packaging');
+  if(cambiosEstado.ean==='SI') detallesCambio.push('EAN → '+nuevoEan);
+  if(cambiosEstado.gram==='SI') detallesCambio.push('Gramaje → '+nuevoGramaje);
+  guardarLocal({
+    id: cambioId,
+    ean: eanActualParaCambio,
+    descripcion: descActualParaCambio,
+    marca: marcaActualParaCambio,
+    fecha_vto: '–',
+    dias: '–',
+    cantidad: '–',
+    resultado: 'CAMBIO REPORTADO',
+    detalleCambio: detallesCambio.join(' | '),
+    estado: 'PENDIENTE'
+  });
+  renderHistorial();
   // Enviar en segundo plano
   fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) }).catch(()=>{});
   document.getElementById('modal-cambios-ok').style.display = 'block';
