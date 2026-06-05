@@ -610,22 +610,21 @@ function verificar(){
   const art=A[currentEAN];
   const dias=Math.round((venc-hoy0())/86400000);
   diasActual=dias;fechaVtoActual=fechaStr;
-  const vuO=art.vu,vuM=art.vu_min;
-  const vo=document.getElementById('verd-orig'),voT=document.getElementById('verd-orig-tit'),voD=document.getElementById('verd-orig-det');
+  const vuM=art.vu_min;
   const vm=document.getElementById('verd-min'),vmT=document.getElementById('verd-min-tit'),vmD=document.getElementById('verd-min-det');
-  vo.className='verd';vm.className='verd';
+  // Ocultar bloque VU original ya que no se usa
+  const vo=document.getElementById('verd-orig');
+  if(vo) vo.style.display='none';
+  vm.className='verd';
   hayRechazo=false;
 
   if(dias<0){
-    vo.classList.add('mal');voT.textContent='✘ PRODUCTO VENCIDO';voD.innerHTML='Venció hace <span class="dias-n">'+Math.abs(dias)+'</span> días.';
-    vm.classList.add('mal');vmT.textContent='✘ PRODUCTO VENCIDO';vmD.innerHTML='No recepcionar.';
+    vm.classList.add('mal');vmT.textContent='✘ PRODUCTO VENCIDO';vmD.innerHTML='Venció hace <span class="dias-n">'+Math.abs(dias)+'</span> días. No recepcionar.';
     hayRechazo=true;
   } else {
-    if(dias>=vuO){vo.classList.add('ok');voT.textContent='✔ OK con VU Original';voD.innerHTML='Quedan <span class="dias-n">'+dias+'</span> días. Mín: '+vuO+'.';}
-    else{vo.classList.add('mal');voT.textContent='✘ FECHA CORTA — VU Original';voD.innerHTML='Quedan <span class="dias-n">'+dias+'</span> días. Se necesitan '+vuO+'.';hayRechazo=true;}
     if(!vuM){vm.classList.add('warn');vmT.textContent='⚠ Sin VU mínima';vmD.innerHTML='Consultá supervisor.';}
-    else if(dias>=vuM){vm.classList.add('ok');vmT.textContent='✔ OK con VU Mínima';vmD.innerHTML='Quedan <span class="dias-n">'+dias+'</span> días. Mín: '+vuM+'.';}
-    else{vm.classList.add('mal');vmT.textContent='✘ FECHA CORTA — No alcanza';vmD.innerHTML='Quedan <span class="dias-n">'+dias+'</span> días. VU mín: '+vuM+'.';hayRechazo=true;}
+    else if(dias>=vuM){vm.classList.add('ok');vmT.textContent='✔ OK';vmD.innerHTML='Quedan <span class="dias-n">'+dias+'</span> días. VU mínima: '+vuM+'.';}
+    else{vm.classList.add('mal');vmT.textContent='✘ FECHA CORTA';vmD.innerHTML='Quedan <span class="dias-n">'+dias+'</span> días. Se necesitan '+vuM+'.';hayRechazo=true;}
   }
 
   document.getElementById('veredictos').classList.add('visible');
