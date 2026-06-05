@@ -146,6 +146,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="hoy" id="hoy"></div>
 </div>
 <div class="container">
+  <div style="background:#fff;border-radius:12px;padding:10px 14px;margin-bottom:10px;border:1.5px solid var(--border);display:flex;align-items:center;gap:10px">
+    <span style="font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap">👤 Operario:</span>
+    <input type="text" id="nombre-operario" placeholder="Ingresá tu nombre…"
+      style="flex:1;border:none;outline:none;font-size:14px;font-weight:600;color:var(--text);background:transparent"
+      oninput="guardarNombreOperario(this.value)"/>
+  </div>
+
   <div class="scan-card">
     <div id="catalogo-info" style="font-size:11px;color:var(--muted);margin-bottom:6px;text-align:center">⏳ Cargando catálogo...</div>
   <div class="label">Escanear EAN</div>
@@ -307,6 +314,18 @@ const hoyDate=hoy0();
 const dd=String(hoyDate.getDate()).padStart(2,'0');
 const mm=String(hoyDate.getMonth()+1).padStart(2,'0');
 const fechaHoyStr=dd+'/'+mm+'/'+hoyDate.getFullYear();
+
+// ─── OPERARIO ──────────────────────────────────────────────────────────────
+function getNombreOperario(){ return localStorage.getItem('nombre_operario')||''; }
+function guardarNombreOperario(val){
+  localStorage.setItem('nombre_operario', val.trim());
+}
+function initNombreOperario(){
+  const nombre = getNombreOperario();
+  const input = document.getElementById('nombre-operario');
+  if(input) input.value = nombre;
+}
+// ───────────────────────────────────────────────────────────────────────────
 document.getElementById('hoy').textContent=fechaHoyStr;
 
 function focoEAN(){setTimeout(()=>document.getElementById('ean').focus(),100);}
