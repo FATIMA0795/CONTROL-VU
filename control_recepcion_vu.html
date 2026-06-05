@@ -710,8 +710,9 @@ function enviarBandeja(){
 let reportandoEAN = false;
 // ─── POLLING CAMBIOS REPORTADOS ──────────────────────────────────────────────
 function pollCambios(){
-  const key='cambios_'+fechaHoyStr.replace(/\//g,'_');
-  const pendientes=JSON.parse(localStorage.getItem(key)||'[]').filter(c=>!c.estado||c.estado==='PENDIENTE');
+  const histKey='hist_'+fechaHoyStr.replace(/\//g,'_');
+  const histItems=JSON.parse(localStorage.getItem(histKey)||'[]');
+  const pendientes=histItems.filter(c=>c.resultado==='CAMBIO REPORTADO'&&(!c.estado||c.estado==='PENDIENTE'));
   if(pendientes.length===0) return;
   fetch(SCRIPT_URL+'?tipo=cambios_reportados&t='+Date.now())
   .then(r=>r.json())
@@ -720,27 +721,17 @@ function pollCambios(){
     pendientes.forEach(p=>{
       const found=data.find(d=>String(d.id)===String(p.id)&&d.estado!=='PENDIENTE');
       if(found){
-        const items=JSON.parse(localStorage.getItem(key)||'[]');
+        const items=JSON.parse(localStorage.getItem(histKey)||'[]');
         const idx=items.findIndex(i=>String(i.id)===String(p.id));
-        if(idx>=0){ items[idx].estado=found.estado; localStorage.setItem(key,JSON.stringify(items)); cambio=true; }
+        if(idx>=0){ items[idx].estado=found.estado; localStorage.setItem(histKey,JSON.stringify(items)); cambio=true; }
       }
     });
-    if(cambio) renderHistorialCambios();
+    if(cambio){ renderHistorial(); }
   }).catch(()=>{});
 }
 setInterval(pollCambios,4000);
 
-function renderHistorialCambios(){
-  // Actualizar visualmente los cambios en el historial si los hay
-  const key='cambios_'+fechaHoyStr.replace(/\//g,'_');
-  const items=JSON.parse(localStorage.getItem(key)||'[]');
-  items.forEach(c=>{
-    const el=document.getElementById('cambio_local_'+c.id);
-    if(el && c.estado && c.estado!=='PENDIENTE'){
-      el.innerHTML='<span style="color:'+(c.estado==='ACEPTADO'?'#059669':'#dc2626')+';font-weight:700">'+(c.estado==='ACEPTADO'?'✔ Recepciones: Aceptado, avisan al área':'✘ Recepciones: Rechazado, no lo trabajamos')+'</span>';
-    }
-  });
-}
+function renderHistorialCambios(){ renderHistorial(); }
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─── REPORTAR CAMBIOS ────────────────────────────────────────────────────────
