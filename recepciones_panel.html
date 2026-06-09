@@ -207,7 +207,7 @@ function getRecomendacion(inc, art){
   const ventaSem = art.venta_sem !== null ? art.venta_sem : null;
 
   // Garantía mínima al cliente = 50% de VU mínima
-  const garantiaCliente = vuMin ? Math.round(vuMin * 0.5) : null;
+  const garantiaCliente = vuMin ? Math.round(vuMin * 0.7) : null;
 
   // Categoría según VU mínima
   const esPerecedero = vuMin !== null && vuMin < 40;
@@ -252,7 +252,7 @@ function getRecomendacion(inc, art){
 Stock simulado: ${stockSimulado} u. (${stock||0} actual + ${cantidadIngresa} ingresando)
 Días para vender todo: ${diasParaVender} días (${semanasStockSimulado} semanas)
 Días restantes al último cliente: ${diasAlUltimoCliente} días
-Garantía mínima al cliente: ${garantiaCliente} días (50% de VU mín)
+Garantía mínima al cliente: ${garantiaCliente} días (70% de VU mín)
 ⚠ No alcanza. El último cliente recibiría el producto con ${diasAlUltimoCliente} días, por debajo de los ${garantiaCliente} requeridos.`
     };
   }
@@ -553,6 +553,9 @@ function cargarArticulos(input){
         // Normalizar keys del row para evitar problemas de mayúsculas/minúsculas/tildes
         const rowNorm={};
         for(const k in row){ rowNorm[k.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')]=row[k]; }
+        // Saltar artículos bloqueados (columna "Bloqueado" = VERDADERO / TRUE)
+        const bloqueado=String(rowNorm['bloqueado']||'').trim().toUpperCase();
+        if(bloqueado==='VERDADERO'||bloqueado==='TRUE'||bloqueado==='1') continue;
         const ean=String(rowNorm['cod barras']||rowNorm['codbarras']||rowNorm['ean']||rowNorm['cod_barras']||'').trim();
         const conservaRaw=String(rowNorm['conservacion']||'').split(' - ')[0].replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ]/g,'').trim().toUpperCase();
         // vu se calcula abajo con rowNorm
@@ -715,7 +718,7 @@ function consultarCompras(id, desc, ean, dias, cantidad, vuMin, vuOrig){
   responder(id, 'EN CONSULTA');
   // Calcular porcentaje de VU y garantía
   const pct = vuOrig ? Math.round((parseInt(dias) / parseInt(vuOrig)) * 100) : 'N/A';
-  const garantia = vuMin ? Math.round(parseInt(vuMin) * 0.5) : 'N/A';
+  const garantia = vuMin ? Math.round(parseInt(vuMin) * 0.7) : 'N/A';
   // Armar mensaje de WhatsApp
   const msg = 
     '🔴 *CONSULTA DE RECEPCIÓN — FECHA CORTA*%0A%0A' +
