@@ -163,6 +163,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         <button onclick="cargarVentasDesdeSheets()" style="width:100%;height:36px;background:var(--green-text);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:6px">↻ Actualizar desde Sheets</button>
         <div id="ventas-status" style="font-size:11px;color:var(--muted)">Sin actualizar — hacé clic para cargar</div>
       </div>
+      <div style="flex:1;min-width:200px">
+        <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.8px">📊 VU Mínima (Calculadora)</div>
+        <input type="file" accept=".xlsx,.xls" onchange="cargarVuMinima(this)" style="font-size:12px;color:var(--muted);width:100%;margin-bottom:4px"/>
+        <div id="vu-minima-status" style="font-size:11px;color:var(--muted)">Sin actualizar — cargar Excel de calculadora</div>
+      </div>
     </div>
   </div>
 </div>
@@ -199,7 +204,7 @@ function getRecomendacion(inc, art){
   if(!art) return {tipo:'evaluar', titulo:'⚠ Evaluar manualmente', detalle:'No hay datos suficientes para una recomendación automática.'};
   
   const dias = parseInt(inc.dias);
-  const vuMin = art.vu_min || parseInt(inc.vu_min) || null;
+  const vuMin = art.vu_min || VU_MIN_LOCAL[inc.ean] || parseInt(inc.vu_min) || null;
   const stockMaer = art.stock !== null ? art.stock : null;
   const cantidadIngresa = parseInt(inc.cantidad) || 0;
   // Stock simulado = stock actual de Maer + cantidad que está ingresando
@@ -588,6 +593,55 @@ function cargarArticulos(input){
       input.value='';
     }catch(err){
       document.getElementById('articulos-status').innerHTML='<span style="color:var(--red-text)">⚠ Error al leer archivo</span>';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// VU_MIN en memoria — se carga del Excel de la calculadora
+var VU_MIN_LOCAL = {};
+
+function cargarVuMinima(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1});
+      let headerRow=-1, colEAN=-1, colVuMin=-1;
+      for(let i=0;i<Math.min(rows.length,20);i++){
+        const r=rows[i];
+        if(!r) continue;
+        for(let j=0;j<r.length;j++){
+          const v=String(r[j]||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+          if(v.includes('cod modelo')||v.includes('codigo')||v==='ean'||v.includes('cod_modelo')) colEAN=j;
+          if(v.includes('vu min')||v.includes('dias vu')||v.includes('minima')||v.includes('vu_min')) colVuMin=j;
+        }
+        if(colEAN>=0 && colVuMin>=0){ headerRow=i; break; }
+      }
+      if(headerRow<0||colEAN<0||colVuMin<0){
+        document.getElementById('vu-minima-status').innerHTML='<span style="color:var(--red-text)">⚠ No se encontraron columnas EAN/VU Mínima en el archivo</span>';
+        return;
+      }
+      VU_MIN_LOCAL={};
+      let count=0;
+      for(let i=headerRow+1;i<rows.length;i++){
+        const r=rows[i];
+        if(!r) continue;
+        const ean=String(r[colEAN]||'').trim();
+        const vuMin=parseInt(r[colVuMin]||0);
+        if(ean && vuMin){
+          VU_MIN_LOCAL[ean]=vuMin;
+          if(ART[ean]) ART[ean].vu_min=vuMin;
+          count++;
+        }
+      }
+      document.getElementById('vu-minima-status').innerHTML='<span style="color:var(--green-text)">✔ VU Mínima cargada: '+count+' artículos</span>';
+      if(ultimosDatos && ultimosDatos.length>0) renderIncidencias(ultimosDatos);
+    }catch(err){
+      document.getElementById('vu-minima-status').innerHTML='<span style="color:var(--red-text)">⚠ Error al leer archivo: '+err.message+'</span>';
     }
   };
   reader.readAsArrayBuffer(file);
