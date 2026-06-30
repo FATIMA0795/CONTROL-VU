@@ -167,7 +167,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="art-desc" id="art-desc"></div>
     <div class="art-ean" id="art-ean"></div>
     <div class="vu-row">
-      <div class="chip" id="chip-orig"><div class="chip-label">VU Original</div><div class="chip-val" id="vu-orig-val">–</div><div class="chip-unit">días</div></div>
+      <div class="chip" id="chip-orig" style="display:none"><div class="chip-label">VU Original</div><div class="chip-val" id="vu-orig-val">–</div><div class="chip-unit">días</div></div>
       <div class="chip" id="chip-min"><div class="chip-label">VU Mínima</div><div class="chip-val" id="vu-min-val">–</div><div class="chip-unit" id="vu-min-unit">días</div></div>
     </div>
     <div class="fecha-section">
@@ -182,7 +182,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="ocr-status" id="ocr-status"></div>
       <div class="fecha-error" id="fecha-error">Fecha inválida</div>
       <div class="veredictos" id="veredictos">
-        <div class="verd" id="verd-orig"><div class="verd-titulo" id="verd-orig-tit"></div><div class="verd-detalle" id="verd-orig-det"></div></div>
+        <div class="verd" id="verd-orig" style="display:none"><div class="verd-titulo" id="verd-orig-tit"></div><div class="verd-detalle" id="verd-orig-det"></div></div>
         <div class="verd" id="verd-min"><div class="verd-titulo" id="verd-min-tit"></div><div class="verd-detalle" id="verd-min-det"></div></div>
         <div class="seccion-confirmar" id="seccion-confirmar">
           <div class="cant-row">
@@ -279,7 +279,10 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwqK7NFDkCTBMaaFmuNj
 let A = {};
 let catalogoCargado = false;
 
-async function cargarCatalogo() {
+async function cargarCatalogo(intento) {
+  intento = intento || 1;
+  const el = document.getElementById('catalogo-info');
+  if (el) el.innerHTML = '⏳ Cargando catálogo... (intento ' + intento + ')';
   try {
     const r = await fetch(SCRIPT_URL + '?tipo=catalogo&t=' + Date.now());
     const data = await r.json();
@@ -296,12 +299,15 @@ async function cargarCatalogo() {
     }
     catalogoCargado = true;
     console.log('Catálogo cargado:', Object.keys(A).length, 'artículos');
-    const el = document.getElementById('catalogo-info');
     if (el) el.textContent = '✔ ' + Object.keys(A).length + ' artículos cargados';
   } catch(err) {
-    console.warn('Error cargando catálogo:', err);
-    const el = document.getElementById('catalogo-info');
-    if (el) el.textContent = '⚠ Sin conexión a catálogo';
+    console.warn('Error cargando catálogo (intento ' + intento + '):', err);
+    if (intento < 4) {
+      // Reintentar automáticamente con espera creciente (2s, 4s, 6s)
+      setTimeout(() => cargarCatalogo(intento + 1), intento * 2000);
+    } else {
+      if (el) el.innerHTML = '⚠ Sin conexión a catálogo &nbsp; <button onclick="cargarCatalogo(1)" style="background:#000;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer">🔄 Reintentar</button>';
+    }
   }
 }
 let currentEAN = null;
@@ -587,9 +593,12 @@ function buscar(){
   const ean=document.getElementById('ean').value.trim();
   resetResult();
   if(!ean)return;
-  const art=A[ean];
+  // Buscar EAN directo, si no lo encuentra probar con 0 adelante (lectores que cortan el 0 inicial)
+  let art=A[ean];
+  let eanFinal=ean;
+  if(!art && A['0'+ean]){ art=A['0'+ean]; eanFinal='0'+ean; }
   if(!art){document.getElementById('not-found').classList.add('visible');return;}
-  currentEAN=ean;
+  currentEAN=eanFinal;
   document.getElementById('art-marca').textContent=art.marca;
   document.getElementById('art-desc').textContent=art.desc;
   document.getElementById('art-ean').textContent='EAN: '+ean;
