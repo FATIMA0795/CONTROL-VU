@@ -279,38 +279,13 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwqK7NFDkCTBMaaFmuNj
 let A = {};
 let catalogoCargado = false;
 
-function fechaHoyKey() {
-  const d = new Date();
-  return d.getFullYear() + '-' + (d.getMonth()+1) + '-' + d.getDate();
-}
-
 async function cargarCatalogo(intento) {
   intento = intento || 1;
   const el = document.getElementById('catalogo-info');
-
-  // 1) Intentar usar artículos cacheados de HOY (instantáneo, sin esperar red)
-  try {
-    const cache = localStorage.getItem('articulos_cache');
-    const cacheFecha = localStorage.getItem('articulos_cache_fecha');
-    if (cache && cacheFecha === fechaHoyKey()) {
-      const arts = JSON.parse(cache);
-      for (const [ean, v] of Object.entries(arts)) {
-        A[ean] = { desc: v.desc||'', marca: v.marca||'', vu: Number(v.vu)||0, vu_min: v.vu_min?Number(v.vu_min):null, conserva: v.conserva||'', stock: 0, venta_sem: null };
-      }
-      catalogoCargado = true;
-      if (el) el.textContent = '✔ ' + Object.keys(A).length + ' artículos (caché de hoy)';
-      // Traer stock fresco en segundo plano, sin bloquear al operario
-      actualizarStockFresco();
-      return;
-    }
-  } catch(e) { console.warn('Error leyendo caché local:', e); }
-
-  // 2) No hay caché de hoy → traer todo del servidor
   if (el) el.innerHTML = '⏳ Cargando catálogo... (intento ' + intento + ')';
   try {
     const r = await fetch(SCRIPT_URL + '?tipo=catalogo&t=' + Date.now());
     const data = await r.json();
-    const soloArticulos = {};
     for (const [ean, v] of Object.entries(data)) {
       A[ean] = {
         desc: v.desc || '',
@@ -321,45 +296,17 @@ async function cargarCatalogo(intento) {
         stock: Number(v.stock) || 0,
         venta_sem: v.venta_sem !== undefined ? v.venta_sem : null
       };
-      soloArticulos[ean] = { desc: v.desc||'', marca: v.marca||'', vu: v.vu||0, vu_min: v.vu_min||null, conserva: v.conserva||'' };
     }
     catalogoCargado = true;
-    // Guardar SOLO artículos (sin stock) en caché de hoy
-    try {
-      localStorage.setItem('articulos_cache', JSON.stringify(soloArticulos));
-      localStorage.setItem('articulos_cache_fecha', fechaHoyKey());
-    } catch(e) { console.warn('No se pudo guardar caché:', e); }
     console.log('Catálogo cargado:', Object.keys(A).length, 'artículos');
     if (el) el.textContent = '✔ ' + Object.keys(A).length + ' artículos cargados';
   } catch(err) {
     console.warn('Error cargando catálogo (intento ' + intento + '):', err);
     if (intento < 4) {
-      // Reintentar automáticamente con espera creciente (2s, 4s, 6s)
       setTimeout(() => cargarCatalogo(intento + 1), intento * 2000);
     } else {
       if (el) el.innerHTML = '⚠ Sin conexión a catálogo &nbsp; <button onclick="cargarCatalogo(1)" style="background:#000;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer">🔄 Reintentar</button>';
     }
-  }
-}
-
-// Trae stock y venta semanal frescos (sin re-descargar artículos) cuando ya hay caché del día
-async function actualizarStockFresco() {
-  try {
-    const [rStock, rVentas] = await Promise.all([
-      fetch(SCRIPT_URL + '?tipo=stock&t=' + Date.now()),
-      fetch(SCRIPT_URL + '?tipo=ventas&t=' + Date.now())
-    ]);
-    const stocks = await rStock.json();
-    const ventas = await rVentas.json();
-    for (const [ean, stock] of Object.entries(stocks)) {
-      if (A[ean]) A[ean].stock = Number(stock) || 0;
-    }
-    for (const [ean, venta] of Object.entries(ventas)) {
-      if (A[ean]) A[ean].venta_sem = venta;
-    }
-    console.log('Stock y venta semanal actualizados:', Object.keys(stocks).length, 'artículos con stock,', Object.keys(ventas).length, 'con venta');
-  } catch(err) {
-    console.warn('No se pudo actualizar stock/ventas frescos (se sigue usando el del caché):', err);
   }
 }
 let currentEAN = null;
