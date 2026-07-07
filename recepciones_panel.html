@@ -478,7 +478,7 @@ function renderInc(inc,pendiente){
       <input type="text" class="obs-input" id="obs_${inc.id}" placeholder="Observación (opcional)…" />
       <button class="btn-aceptar" onclick="responder('${inc.id}','ACEPTADA')">✔ Aceptar</button>
       <button class="btn-rechazar" onclick="responder('${inc.id}','RECHAZADA')">✘ Rechazar</button>
-      <button style="height:38px;padding:0 16px;background:#e65100;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer" onclick="consultarCompras('${inc.id}','${inc.descripcion}','${inc.ean}','${inc.dias}','${inc.cantidad}','${inc.vu_min}','${inc.vu_orig}')">📲 Consultar a Compras</button>
+      <button style="height:38px;padding:0 16px;background:#e65100;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer" onclick="consultarCompras('${inc.id}','${inc.descripcion}','${inc.ean}','${inc.dias}','${inc.cantidad}','${inc.vu_min}','${inc.vu_orig}','${stockMaerLocal||0}','${stockSimuladoLocal||0}')">📲 Consultar a Compras</button>
     </div>` : `<div class="respuesta-dada">${inc.observacion ? '💬 ' + inc.observacion : ''}</div>`;
 
   return `<div class="inc ${pendiente?'pendiente':inc.estado}" id="inc_${inc.id}">
@@ -557,7 +557,9 @@ function cargarArticulos(input){
         // Saltar artículos bloqueados (columna "Bloqueado" = VERDADERO / TRUE)
         const bloqueado=String(rowNorm['bloqueado']||'').trim().toUpperCase();
         if(bloqueado==='VERDADERO'||bloqueado==='TRUE'||bloqueado==='1') continue;
-        const ean=String(rowNorm['cod barras']||rowNorm['codbarras']||rowNorm['ean']||rowNorm['cod_barras']||'').trim();
+        let ean=String(rowNorm['cod barras']||rowNorm['codbarras']||rowNorm['ean']||rowNorm['cod_barras']||'').trim();
+        // Normalizar EAN: si tiene 14 dígitos y empieza con 0, sacarle el 0 adelante
+        if(ean.length===14 && ean.startsWith('0')) ean=ean.slice(1);
         const conservaRaw=String(rowNorm['conservacion']||'').split(' - ')[0].replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ]/g,'').trim().toUpperCase();
         // vu se calcula abajo con rowNorm
         const vu2=parseInt(rowNorm['vida util']||rowNorm['vu']||rowNorm['vida_util']||0);
@@ -768,7 +770,7 @@ function cargarVentas(input){
   reader.readAsArrayBuffer(file);
 }
 
-function consultarCompras(id, desc, ean, dias, cantidad, vuMin, vuOrig){
+function consultarCompras(id, desc, ean, dias, cantidad, vuMin, vuOrig, stockMaer, stockSimulado){
   // Registrar en Sheets como EN CONSULTA
   responder(id, 'EN CONSULTA');
   // Calcular porcentaje de VU y garantía
@@ -782,6 +784,7 @@ function consultarCompras(id, desc, ean, dias, cantidad, vuMin, vuOrig){
     '📅 *Días restantes:* ' + dias + ' días%0A' +
     '📊 *% de vida útil al ingresar:* ' + pct + '%25%0A' +
     '📦 *Cantidad ingresando:* ' + (cantidad||'N/D') + ' u.%0A' +
+    '🏪 *Stock Maer + ingresando:* ' + stockMaer + ' + ' + (cantidad||0) + ' = ' + stockSimulado + ' u. simulado%0A' +
     '⏱ *Garantía mínima al cliente:* ' + garantia + ' días%0A%0A' +
     '¿Aceptamos o rechazamos? Por favor responder a la brevedad.';
   // Abrir WhatsApp

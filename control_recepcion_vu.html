@@ -592,10 +592,8 @@ function buscar(){
   const ean=document.getElementById('ean').value.trim();
   resetResult();
   if(!ean)return;
-  // Buscar EAN directo, si no lo encuentra probar con 0 adelante (lectores que cortan el 0 inicial)
   let art=A[ean];
   let eanFinal=ean;
-  if(!art && A['0'+ean]){ art=A['0'+ean]; eanFinal='0'+ean; }
   if(!art){document.getElementById('not-found').classList.add('visible');return;}
   currentEAN=eanFinal;
   document.getElementById('art-marca').textContent=art.marca;
