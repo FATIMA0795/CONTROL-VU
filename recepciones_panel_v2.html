@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recepciones – Panel de Incidencias</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f2f1ed;--surface:#fff;--border:#e0ddd5;--text:#18180f;--muted:#6b6a62;--accent:#18180f;
+  --green-bg:#eaf3de;--green-text:#2d5a12;--green-border:#7ab648;
+  --red-bg:#fdecea;--red-text:#8b1a1a;--red-border:#e05a5a;
+  --warn-bg:#fef8e6;--warn-text:#7a5a00;--warn-border:#e6c040;
+  --orange:#e65100;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.header{background:var(--accent);color:#fff;padding:16px 24px;display:flex;align-items:center;justify-content:space-between}
+.header h1{font-size:18px;font-weight:600}
+.header .sub{font-size:13px;opacity:.6;margin-top:2px}
+.header-right{display:flex;align-items:center;gap:12px}
+.btn-refresh{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);padding:8px 16px;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600}
+.ultimo-update{font-size:11px;opacity:.6;color:#fff}
+.container{max-width:960px;margin:0 auto;padding:24px}
+.stats{display:flex;gap:12px;margin-bottom:24px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 20px;flex:1;text-align:center}
+.stat-val{font-size:28px;font-weight:700}
+.stat-label{font-size:12px;color:var(--muted);margin-top:2px;font-weight:600;text-transform:uppercase;letter-spacing:.8px}
+.stat.pendiente .stat-val{color:var(--orange)}
+.stat.aceptada .stat-val{color:var(--green-text)}
+.stat.rechazada .stat-val{color:var(--red-text)}
+.seccion-titulo{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:12px}
+.incidencias{display:flex;flex-direction:column;gap:12px;margin-bottom:32px}
+.inc{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px}
+.inc.pendiente{border-left:4px solid var(--orange)}
+.inc.ACEPTADA{border-left:4px solid var(--green-border);opacity:.8}
+.inc.RECHAZADA{border-left:4px solid var(--red-border);opacity:.8}
+.inc-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.inc-desc{font-size:15px;font-weight:600;line-height:1.3}
+.inc-marca{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:2px}
+.inc-meta{font-size:12px;color:var(--muted);margin-top:4px;font-family:monospace}
+.badge{display:inline-block;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;text-transform:uppercase;white-space:nowrap}
+.badge.pendiente{background:var(--warn-bg);color:var(--warn-text);border:1px solid var(--warn-border)}
+.badge.ACEPTADA{background:var(--green-bg);color:var(--green-text);border:1px solid var(--green-border)}
+.badge.RECHAZADA{background:var(--red-bg);color:var(--red-text);border:1px solid var(--red-border)}
+
+/* DATOS GRID */
+.datos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-bottom:14px}
+.dato{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 14px}
+.dato-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:4px}
+.dato-val{font-size:20px;font-weight:800;line-height:1}
+.dato-unit{font-size:11px;color:var(--muted)}
+.dato.alerta{background:var(--red-bg);border-color:var(--red-border)}
+.dato.alerta .dato-val{color:var(--red-text)}
+.dato.ok{background:var(--green-bg);border-color:var(--green-border)}
+.dato.ok .dato-val{color:var(--green-text)}
+.dato.warn{background:var(--warn-bg);border-color:var(--warn-border)}
+.dato.warn .dato-val{color:var(--warn-text)}
+
+/* BARRA % VU */
+.vu-bar-wrap{margin-bottom:14px}
+.vu-bar-label{font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600}
+.vu-bar-bg{background:var(--border);border-radius:6px;height:12px;overflow:hidden}
+.vu-bar-fill{height:100%;border-radius:6px;transition:width .3s}
+
+/* RECOMENDACION */
+.recomendacion{border-radius:10px;padding:12px 16px;margin-bottom:14px;border:1px solid}
+.recomendacion.aceptar{background:var(--green-bg);border-color:var(--green-border)}
+.recomendacion.rechazar{background:var(--red-bg);border-color:var(--red-border)}
+.recomendacion.evaluar{background:var(--warn-bg);border-color:var(--warn-border)}
+.recomendacion.consultar{background:#fff3e0;border-color:#ff9800}
+.rec-titulo{font-size:14px;font-weight:800;margin-bottom:4px}
+.recomendacion.aceptar .rec-titulo{color:var(--green-text)}
+.recomendacion.rechazar .rec-titulo{color:var(--red-text)}
+.recomendacion.evaluar .rec-titulo{color:var(--warn-text)}
+.recomendacion.consultar .rec-titulo{color:#e65100}
+.rec-detalle{font-size:12px;line-height:1.5}
+.recomendacion.aceptar .rec-detalle{color:#3a6b1a}
+.recomendacion.rechazar .rec-detalle{color:var(--red-text)}
+.recomendacion.evaluar .rec-detalle{color:var(--warn-text)}
+.recomendacion.consultar .rec-detalle{color:#e65100}
+
+.acciones{display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:12px}
+.obs-input{flex:1;min-width:180px;height:38px;border:1.5px solid var(--border);border-radius:8px;padding:0 12px;font-size:14px;outline:none}
+.obs-input:focus{border-color:var(--accent)}
+.btn-aceptar{height:38px;padding:0 16px;background:var(--green-text);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
+.btn-rechazar{height:38px;padding:0 16px;background:var(--red-text);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer}
+.respuesta-dada{font-size:13px;color:var(--muted);margin-top:8px;font-style:italic}
+.empty{text-align:center;padding:40px;color:var(--muted);font-size:15px}
+.loading{text-align:center;padding:20px;color:var(--muted);font-size:13px}
+.error-banner{background:#fdecea;border:1px solid #e05a5a;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#8b1a1a;display:none}
+.error-banner.visible{display:block}
+
+/* HISTORIAL RECEPCIONES */
+.hist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-bottom:32px}
+.hist-item{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.hist-item.ok{border-left:4px solid var(--green-border)}
+.hist-item.corta{border-left:4px solid var(--red-border)}
+.hist-desc{font-size:13px;font-weight:600;margin-bottom:2px}
+.hist-meta{font-size:11px;color:var(--muted)}
+.hist-resultado{font-size:11px;font-weight:700;margin-top:3px}
+.hist-resultado.ok{color:var(--green-text)}
+.hist-resultado.corta{color:var(--red-text)}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>🏭 Panel de Recepciones</h1>
+    <div class="sub">Incidencias e historial del día</div>
+  </div>
+  <div class="header-right">
+    <div class="ultimo-update" id="ultimo-update"></div>
+    <button class="btn-refresh" onclick="cargar(true)">↻ Actualizar</button>
+  </div>
+</div>
+<div class="container">
+  <div class="error-banner" id="error-banner">⚠ Error al conectar. Los datos mostrados pueden no estar actualizados.</div>
+  <div class="stats">
+    <div class="stat pendiente"><div class="stat-val" id="cnt-pendiente">–</div><div class="stat-label">Pendientes</div></div>
+    <div class="stat aceptada"><div class="stat-val" id="cnt-aceptada">–</div><div class="stat-label">Aceptadas</div></div>
+    <div class="stat rechazada"><div class="stat-val" id="cnt-rechazada">–</div><div class="stat-label">Rechazadas</div></div>
+  </div>
+  <!-- FILTROS DE CONSERVA -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
+    <span style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-right:4px">Filtrar:</span>
+    <button onclick="setFiltroConserva('TODOS')" id="filtro-TODOS" style="height:30px;padding:0 14px;border-radius:20px;border:1px solid var(--border);background:var(--accent);color:#fff;font-size:12px;font-weight:600;cursor:pointer">Todos</button>
+    <button onclick="setFiltroConserva('SECO')" id="filtro-SECO" style="height:30px;padding:0 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:600;cursor:pointer">🌾 Seco</button>
+    <button onclick="setFiltroConserva('COSMETICA')" id="filtro-COSMETICA" style="height:30px;padding:0 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:600;cursor:pointer">💄 Cosmética</button>
+    <button onclick="setFiltroConserva('CONGELADO')" id="filtro-CONGELADO" style="height:30px;padding:0 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:600;cursor:pointer">❄️ Congelado</button>
+    <button onclick="setFiltroConserva('REFRIGERADO')" id="filtro-REFRIGERADO" style="height:30px;padding:0 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:600;cursor:pointer">🧊 Refrigerado</button>
+    <button onclick="setFiltroConserva('CHOCOLATES')" id="filtro-CHOCOLATES" style="height:30px;padding:0 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:600;cursor:pointer">🍫 Chocolates</button>
+  </div>
+  <div class="seccion-titulo">⏳ Incidencias Pendientes</div>
+  <div class="incidencias" id="pendientes"><div class="loading">Cargando…</div></div>
+  <div class="seccion-titulo">📋 Historial de Incidencias</div>
+  <div class="incidencias" id="historial-inc"></div>
+  <div class="seccion-titulo">🔍 EAN Desconocidos</div>
+  <div class="incidencias" id="ean-desconocidos"><div class="loading">Cargando…</div></div>
+
+  <div class="seccion-titulo">📦 Cambios Reportados</div>
+  <div class="incidencias" id="cambios-reportados"><div class="loading">Cargando…</div></div>
+
+  <div class="seccion-titulo">📦 Recepciones del día</div>
+  <div class="hist-grid" id="historial-rec"><div class="empty">Cargando…</div></div>
+
+  <!-- ACTUALIZAR DATOS -->
+  <div style="background:var(--surface);border:1px dashed var(--border);border-radius:14px;padding:18px;margin-top:8px;margin-bottom:24px">
+    <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:14px">⚙ Actualizar datos del día</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.8px">Stock del día (Excel de Maer)</div>
+        <input type="file" accept=".xlsx,.xls" onchange="cargarStock(this)" style="font-size:12px;color:var(--muted);width:100%;margin-bottom:4px"/>
+        <button onclick="cargarStockDesdeSheets()" style="width:100%;height:32px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:4px">↻ Actualizar desde Sheets</button>
+        <div id="stock-status" style="font-size:11px;color:var(--muted)">Sin actualizar</div>
+      </div>
+      <div style="flex:1;min-width:200px">
+        <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.8px">Artículos + Conserva (Excel de Maer)</div>
+        <input type="file" accept=".xlsx,.xls" onchange="cargarArticulos(this)" style="font-size:12px;color:var(--muted);width:100%;margin-bottom:4px"/>
+        <div id="articulos-status" style="font-size:11px;color:var(--muted)">Sin actualizar</div>
+      </div>
+      <div style="flex:1;min-width:200px">
+        <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.8px">Ventas semanales</div>
+        <button onclick="cargarVentasDesdeSheets()" style="width:100%;height:36px;background:var(--green-text);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:6px">↻ Actualizar desde Sheets</button>
+        <div id="ventas-status" style="font-size:11px;color:var(--muted)">Sin actualizar — hacé clic para cargar</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwqK7NFDkCTBMaaFmuNjg14VyTYnM7IVLkfO_r3XzwZUEnEJ33UGfGmIcx_B9OYoypUvw/exec";
+const ART = {};
+let ultimosDatos = [];
+let pendientesAnteriores = 0;
+
+if('Notification' in window && Notification.permission==='default') Notification.requestPermission();
+
+function sonar(){
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    const osc=ctx.createOscillator(),gain=ctx.createGain();
+    osc.connect(gain);gain.connect(ctx.destination);
+    osc.frequency.value=880;osc.type='sine';
+    gain.gain.setValueAtTime(0.3,ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.8);
+    osc.start(ctx.currentTime);osc.stop(ctx.currentTime+0.8);
+  }catch(e){}
+}
+
+function notificar(cantidad){
+  sonar();
+  if('Notification' in window && Notification.permission==='granted'){
+    new Notification('⚠ Nueva incidencia en Recepciones',{body:'Hay '+cantidad+' incidencia(s) pendiente(s).',requireInteraction:true});
+  }
+}
+
+function getRecomendacion(inc, art){
+  if(!art) return {tipo:'evaluar', titulo:'⚠ Evaluar manualmente', detalle:'No hay datos suficientes para una recomendación automática.'};
+  
+  const dias = parseInt(inc.dias);
+  const vuMin = art.vu_min || VU_MIN_LOCAL[inc.ean] || parseInt(inc.vu_min) || null;
+  const stockMaer = art.stock !== null ? art.stock : null;
+  const cantidadIngresa = parseInt(inc.cantidad) || 0;
+  // Stock simulado = stock actual de Maer + cantidad que está ingresando
+  const stock = stockMaer !== null ? stockMaer + cantidadIngresa : null;
+  const ventaSem = art.venta_sem !== null ? art.venta_sem : null;
+
+  // Garantía mínima al cliente = 50% de VU mínima
+  const garantiaCliente = vuMin ? Math.round(vuMin * 0.7) : null;
+
+  // Categoría según VU mínima
+  const esPerecedero = vuMin !== null && vuMin < 40;
+  const limiteSemanasStock = esPerecedero ? 2 : 3;
+  const categoria = esPerecedero ? 'Perecedero/Refrigerado (VU mín < 40 días)' : 'Seco/General (VU mín ≥ 40 días)';
+
+  // Sin datos suficientes
+  if(stock === null && ventaSem === null){
+    return {tipo:'evaluar', titulo:'⚠ Evaluar manualmente', detalle:`Sin datos de stock ni ventas. Categoría: ${categoria}`};
+  }
+
+  if(ventaSem === null || ventaSem === 0){
+    if(stock === 0 || stock === null){
+      return {tipo:'aceptar', titulo:'✔ ACEPTAR — Sin stock ni ventas registradas', detalle:'No hay stock disponible. Conviene aceptar con precaución.'};
+    }
+    return {tipo:'evaluar', titulo:'⚠ Evaluar manualmente', detalle:`Sin datos de venta semanal. Stock actual: ${stock} u. Consultá con Compras.`};
+  }
+
+  // Venta diaria (5 días hábiles)
+  const ventaDiaria = ventaSem / 5;
+  
+  // Stock simulado = stock actual + cantidad que ingresa
+  // stock ya incluye cantidadIngresa (stockMaer + cantidadIngresa)
+  const stockSimulado = stock || cantidadIngresa;
+  
+  // Días para vender todo el stock simulado
+  const diasParaVender = Math.ceil(stockSimulado / ventaDiaria);
+  const semanasStockSimulado = Math.round((diasParaVender / 7) * 10) / 10;
+
+  // Días restantes al último cliente
+  const diasAlUltimoCliente = dias - diasParaVender;
+
+  // Verificar garantía al cliente
+  const cumpleGarantia = garantiaCliente !== null ? diasAlUltimoCliente >= garantiaCliente : null;
+
+  // RECHAZAR si no cumple garantía al cliente
+  if(cumpleGarantia === false){
+    return {
+      tipo:'rechazar',
+      titulo:'✘ RECHAZAR — No llega con vida útil suficiente al cliente',
+      detalle:`Categoría: ${categoria}
+Stock simulado: ${stockSimulado} u. (${stock||0} actual + ${cantidadIngresa} ingresando)
+Días para vender todo: ${diasParaVender} días (${semanasStockSimulado} semanas)
+Días restantes al último cliente: ${diasAlUltimoCliente} días
+Garantía mínima al cliente: ${garantiaCliente} días (70% de VU mín)
+⚠ No alcanza. El último cliente recibiría el producto con ${diasAlUltimoCliente} días, por debajo de los ${garantiaCliente} requeridos.`
+    };
+  }
+
+  // CONSULTAR A COMPRAS si el stock simulado supera el límite de semanas
+  if(semanasStockSimulado > limiteSemanasStock){
+    return {
+      tipo:'consultar',
+      titulo:`⚠ CONSULTAR A COMPRAS — Stock supera ${limiteSemanasStock} semanas`,
+      detalle:`Categoría: ${categoria}
+Stock Maer: ${stockMaer||0} u. + ${cantidadIngresa} u. ingresando = Stock simulado: ${stock} u.
+Semanas de stock: ${semanasStockSimulado} sem (límite: ${limiteSemanasStock} sem)
+Días restantes al último cliente: ${diasAlUltimoCliente} días ✔
+Garantía mínima al cliente: ${garantiaCliente||'N/A'} días
+Avisá a Compras por WhatsApp antes de tomar una decisión.`
+    };
+  }
+
+  // ACEPTAR
+  return {
+    tipo:'aceptar',
+    titulo:'✔ ACEPTAR',
+    detalle:`Categoría: ${categoria}
+Stock Maer: ${stockMaer||0} u. + ${cantidadIngresa} u. ingresando = Stock simulado: ${stock} u.
+Semanas de stock: ${semanasStockSimulado} sem (límite: ${limiteSemanasStock} sem) ✔
+Días restantes al último cliente: ${diasAlUltimoCliente} días ✔
+Garantía mínima al cliente: ${garantiaCliente||'N/A'} días ✔`
+  };
+}
+
+function cargar(manual){
+  if(manual){
+    const el=document.getElementById('pendientes');
+    if(el&&el.innerHTML.indexOf('loading')===-1) el.innerHTML='<div class="loading">Actualizando…</div>';
+  }
+  fetch(SCRIPT_URL+'?t='+Date.now())
+  .then(r=>r.json())
+  .then(data=>{
+    ultimosDatos=data;
+    document.getElementById('error-banner').classList.remove('visible');
+    const pendientesNuevos=data.filter(d=>d.estado==='PENDIENTE').length;
+    if(!manual&&pendientesNuevos>pendientesAnteriores) notificar(pendientesNuevos);
+    pendientesAnteriores=pendientesNuevos;
+    renderIncidencias(data);
+    const ahora=new Date();
+    document.getElementById('ultimo-update').textContent='Actualizado: '+String(ahora.getHours()).padStart(2,'0')+':'+String(ahora.getMinutes()).padStart(2,'0')+':'+String(ahora.getSeconds()).padStart(2,'0');
+  }).catch(()=>{
+    document.getElementById('error-banner').classList.add('visible');
+    if(ultimosDatos.length===0){
+      document.getElementById('pendientes').innerHTML='<div class="empty">Error al cargar. Hacé clic en Actualizar.</div>';
+    } else {
+      // Usar datos en caché para renderizar aunque falle el fetch
+      renderIncidencias(ultimosDatos);
+    }
+  });
+
+  fetch(SCRIPT_URL+'?tipo=historial&t='+Date.now())
+  .then(r=>r.json())
+  .then(data=>{
+    const hoyDate=new Date();
+    const hhoy=String(hoyDate.getDate()).padStart(2,'0')+'/'+String(hoyDate.getMonth()+1).padStart(2,'0')+'/'+hoyDate.getFullYear();
+    const deHoy=data.filter(d=>{
+      const f=String(d.fecha);
+      if(f===hhoy)return true;
+      if(f.length>=10){const p=f.substring(0,10).split('-');if(p.length===3&&p[2]+'/'+p[1]+'/'+p[0]===hhoy)return true;}
+      return false;
+    }).reverse();
+    const el=document.getElementById('historial-rec');
+    if(deHoy.length===0){el.innerHTML='<div class="empty">Sin recepciones registradas hoy</div>';return;}
+    el.innerHTML=deHoy.map(d=>{
+      const esOk=d.resultado==='OK';
+      return `<div class="hist-item ${esOk?'ok':'corta'}">
+        <div class="hist-desc">${d.descripcion}</div>
+        <div class="hist-meta">EAN: ${d.ean} | Vto: ${d.fecha_vto} | Días: ${d.dias} | Cant: ${d.cantidad||'–'}</div>
+        <div class="hist-resultado ${esOk?'ok':'corta'}">${esOk?'✔ OK':'✘ Fecha corta'}</div>
+      </div>`;
+    }).join('');
+  }).catch(()=>{});
+
+  // Cargar cambios reportados
+  fetch(SCRIPT_URL+'?tipo=cambios_reportados&t='+Date.now())
+  .then(r=>r.json())
+  .then(data=>{
+    const el=document.getElementById('cambios-reportados');
+    if(!el)return;
+    const hoyDate3=new Date();
+    const hoyStr3=new Date().toISOString().substring(0,10);
+    const d3=String(hoyDate3.getDate()).padStart(2,'0');
+    const m3=String(hoyDate3.getMonth()+1).padStart(2,'0');
+    const y3=String(hoyDate3.getFullYear());
+    const hoyStr3Alt=d3+'/'+m3+'/'+y3;
+    const hoyStr3Alt2=d3+'-'+m3+'-'+y3;
+    // Mostrar TODOS los cambios (sin filtro de fecha) para no perder ninguno
+    const deHoy3=data;
+    if(deHoy3.length===0){el.innerHTML='<div class="empty">Sin cambios reportados hoy</div>';return;}
+    el.innerHTML=deHoy3.map(d=>{
+      const esPendiente=d.estado==='PENDIENTE'||!d.estado;
+      const badgeClass=esPendiente?'pendiente':d.estado==='ACEPTADO'?'ACEPTADA':'RECHAZADA';
+      const badgeLabel=esPendiente?'PENDIENTE':d.estado;
+      const detalles=[];
+      if(d.cambio_packaging==='SI') detalles.push('📦 Cambio de packaging');
+      if(d.cambio_ean==='SI') detalles.push('🔢 Cambio de EAN → '+d.nuevo_ean);
+      if(d.cambio_gramaje==='SI') detalles.push('⚖ Cambio de gramaje → '+d.nuevo_gramaje);
+      const acciones=esPendiente?`
+        <div class="acciones">
+          <button class="btn-aceptar" onclick="responderCambio('${d.id}','ACEPTADO')">✔ Aceptarlo, yo aviso al área</button>
+          <button class="btn-rechazar" onclick="responderCambio('${d.id}','RECHAZADO')">✘ Rechazarlo, no lo trabajamos</button>
+        </div>`:
+        `<div class="respuesta-dada">Respondido: ${d.estado}</div>`;
+      return `<div class="inc ${esPendiente?'pendiente':d.estado}" id="cambio_${d.id}">
+        <div class="inc-header">
+          <div>
+            <div class="inc-marca">${d.marca||'Sin marca'}</div>
+            <div class="inc-desc">${d.descripcion||'Sin descripción'}</div>
+            <div class="inc-meta">EAN: ${d.ean} &nbsp;|&nbsp; Reportado: ${String(d.fecha).split('T')[0]}</div>
+            <div class="inc-meta" style="margin-top:4px;color:var(--orange-text)">${detalles.join(' &nbsp;|&nbsp; ')}</div>
+          </div>
+          <div class="badge ${badgeClass}">${badgeLabel}</div>
+        </div>
+        ${acciones}
+      </div>`;
+    }).join('');
+  }).catch(()=>{
+    const el=document.getElementById('cambios-reportados');
+    if(el)el.innerHTML='<div class="empty">Error al cargar cambios.</div>';
+  });
+
+  // Cargar EAN desconocidos
+  fetch(SCRIPT_URL+'?tipo=ean_desconocidos&t='+Date.now())
+  .then(r=>r.json())
+  .then(data=>{
+    const el=document.getElementById('ean-desconocidos');
+    if(!el)return;
+    const hoyStr2=new Date().toISOString().substring(0,10);
+    const deHoy2=data.filter(d=>String(d.fecha).substring(0,10)===hoyStr2);
+    if(deHoy2.length===0){el.innerHTML='<div class="empty">Sin EAN desconocidos pendientes</div>';return;}
+    el.innerHTML=deHoy2.map(d=>{
+      const esPendiente=d.estado==='PENDIENTE';
+      const badgeClass=esPendiente?'pendiente':d.estado==='ACEPTADA'?'ACEPTADA':'RECHAZADA';
+      const badgeLabel=esPendiente?'PENDIENTE':d.estado;
+      const acciones=esPendiente?`
+        <div class="acciones">
+          <input type="text" class="obs-input" id="obs_ean_${d.ean}" placeholder="Observación (opcional)…" />
+          <button class="btn-aceptar" onclick="responderEAN('${d.ean}','ACEPTADA')">✔ Lo trabajamos</button>
+          <button class="btn-rechazar" onclick="responderEAN('${d.ean}','RECHAZADA')">✘ No lo trabajamos</button>
+        </div>`:
+        `<div class="respuesta-dada">${d.observacion?'💬 '+d.observacion:''}</div>`;
+      return `<div class="inc ${esPendiente?'pendiente':d.estado}" id="ean_${d.ean}">
+        <div class="inc-header">
+          <div>
+            <div class="inc-marca">${d.marca||'Sin marca'}</div>
+            <div class="inc-desc">${d.descripcion||'Sin descripción'}</div>
+            <div class="inc-meta">EAN: ${d.ean} &nbsp;|&nbsp; Reportado: ${String(d.fecha).split('T')[0]}</div>
+          </div>
+          <div class="badge ${badgeClass}">${badgeLabel}</div>
+        </div>
+        ${acciones}
+      </div>`;
+    }).join('');
+  }).catch(()=>{
+    const el=document.getElementById('ean-desconocidos');
+    if(el)el.innerHTML='<div class="empty">Error al cargar EAN desconocidos.</div>';
+  });
+}
+
+function renderIncidencias(data){
+  // Pendientes e EN CONSULTA: mostrar todas sin filtro de fecha
+  // Aplicar filtro de conserva
+  const pendientesTodos=data.filter(d=>d.estado==='PENDIENTE'||d.estado==='EN CONSULTA');
+  const pendientes = filtroConserva==='TODOS' ? pendientesTodos : pendientesTodos.filter(d=>{
+    const art=ART[String(d.ean)];
+    if(!art||!art.conserva) return filtroConserva==='SECO'; // sin conserva definida va a SECO
+    const c=art.conserva.toUpperCase();
+    if(filtroConserva==='SECO') return c.includes('SECO');
+    if(filtroConserva==='COSMETICA') return c.includes('COSM');
+    if(filtroConserva==='CONGELADO') return c.includes('CONGELADO');
+    if(filtroConserva==='REFRIGERADO') return c.includes('REFRIGERADO');
+    if(filtroConserva==='CHOCOLATES') return c.includes('CHOCOLATE') || c.includes('DULCE');
+    return true;
+  });
+  // Historial: solo de hoy
+  const hoyLocal = new Date();
+  hoyLocal.setHours(0,0,0,0);
+  const mananaLocal = new Date(hoyLocal);
+  mananaLocal.setDate(mananaLocal.getDate()+1);
+  const historial=data.filter(d=>{
+    if(d.estado==='PENDIENTE'||d.estado==='EN CONSULTA') return false;
+    const f=d.fecha;
+    if(!f) return false;
+    const fechaD = new Date(f);
+    return fechaD >= hoyLocal && fechaD < mananaLocal;
+  }).reverse();
+  document.getElementById('cnt-pendiente').textContent=pendientes.length;
+  document.getElementById('cnt-aceptada').textContent=data.filter(d=>d.estado==='ACEPTADA').length;
+  document.getElementById('cnt-rechazada').textContent=data.filter(d=>d.estado==='RECHAZADA').length;
+  const elPend=document.getElementById('pendientes');
+  elPend.innerHTML=pendientes.length===0?'<div class="empty">✔ No hay incidencias pendientes</div>':pendientes.map(inc=>renderInc(inc,true)).join('');
+  const elHist=document.getElementById('historial-inc');
+  elHist.innerHTML=historial.length===0?'<div class="empty">Sin historial aún</div>':historial.map(inc=>renderInc(inc,false)).join('');
+}
+
+function renderInc(inc,pendiente){
+  const art = ART[String(inc.ean)];
+  const dias = parseInt(inc.dias);
+  const vuOrig = art ? art.vu : parseInt(inc.vu_orig);
+  const pctVU = vuOrig > 0 ? Math.round((dias / vuOrig) * 100) : 0;
+  const barColor = pctVU >= 50 ? '#7ab648' : pctVU >= 25 ? '#e6c040' : '#e05a5a';
+  const pctClass = pctVU >= 50 ? 'ok' : pctVU >= 25 ? 'warn' : 'alerta';
+  const stock = art ? art.stock : null;
+  const ventaSem = art ? art.venta_sem : null;
+  const rec = getRecomendacion(inc, art);
+  const fechaStr = inc.fecha ? String(inc.fecha).split('T')[0] : '';
+  const cantStr = inc.cantidad ? `<div class="dato warn"><div class="dato-label">Cant. fecha corta</div><div class="dato-val">${inc.cantidad}</div><div class="dato-unit">unidades</div></div>` : '';
+
+  const stockMaerLocal = art ? (art.stock !== null ? art.stock : null) : null;
+  const cantIngresa = parseInt(inc.cantidad) || 0;
+  const stockSimuladoLocal = stockMaerLocal !== null ? stockMaerLocal + cantIngresa : (cantIngresa || null);
+  const stockChip = stockSimuladoLocal !== null ? `<div class="dato" style="background:#e8f4fd;border-color:#90caf9"><div class="dato-label">Stock Maer +<br>Ingresando</div><div class="dato-val" style="font-size:13px">${stockMaerLocal||0} + ${cantIngresa} = <strong>${stockSimuladoLocal}</strong></div><div class="dato-unit">u. simulado</div></div>` : '';
+  const ventaStr = ventaSem !== null ? `<div class="dato"><div class="dato-label">Venta semanal</div><div class="dato-val">${ventaSem}</div><div class="dato-unit">u/semana prom.</div></div>` : '';
+  const acciones = pendiente ? `
+    <div class="acciones">
+      <input type="text" class="obs-input" id="obs_${inc.id}" placeholder="Observación (opcional)…" />
+      <button class="btn-aceptar" onclick="responder('${inc.id}','ACEPTADA')">✔ Aceptar</button>
+      <button class="btn-rechazar" onclick="responder('${inc.id}','RECHAZADA')">✘ Rechazar</button>
+      <button style="height:38px;padding:0 16px;background:#e65100;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer" onclick="consultarCompras('${inc.id}','${inc.descripcion}','${inc.ean}','${inc.dias}','${inc.cantidad}','${inc.vu_min}','${inc.vu_orig}','${stockMaerLocal||0}','${stockSimuladoLocal||0}')">📲 Consultar a Compras</button>
+    </div>` : `<div class="respuesta-dada">${inc.observacion ? '💬 ' + inc.observacion : ''}</div>`;
+
+  return `<div class="inc ${pendiente?'pendiente':inc.estado}" id="inc_${inc.id}">
+    <div class="inc-header">
+      <div>
+        <div class="inc-marca">${inc.marca}</div>
+        <div class="inc-desc">${inc.descripcion}</div>
+        <div class="inc-meta">EAN: ${inc.ean} &nbsp;|&nbsp; Recibido: ${fechaStr}</div>
+      </div>
+      <div class="badge ${pendiente?'pendiente':inc.estado}" style="${inc.estado==='EN CONSULTA'?'background:#fff3e0;color:#e65100;border-color:#ff9800':''}">${pendiente?'PENDIENTE':inc.estado}</div>
+    </div>
+    <div class="vu-bar-wrap">
+      <div class="vu-bar-label" style="font-size:15px;font-weight:700;color:${barColor};margin-bottom:6px">
+        📊 Ingresa con el <strong>${pctVU}% de su vida útil</strong> (${dias} días restantes de ${vuOrig} totales)
+      </div>
+      <div class="vu-bar-bg"><div class="vu-bar-fill" style="width:${Math.min(pctVU,100)}%;background:${barColor}"></div></div>
+    </div>
+    <div class="datos-grid">
+      <div class="dato ${pctClass}"><div class="dato-label">% VU al ingresar</div><div class="dato-val">${pctVU}%</div><div class="dato-unit">de vida útil</div></div>
+      <div class="dato"><div class="dato-label">VU Original</div><div class="dato-val">${inc.vu_orig}</div><div class="dato-unit">días</div></div>
+      <div class="dato warn"><div class="dato-label">VU Mínima</div><div class="dato-val">${inc.vu_min||'–'}</div><div class="dato-unit">días</div></div>
+      ${cantStr}${stockChip}${ventaStr}
+    </div>
+    ${pendiente ? `<div class="recomendacion ${rec.tipo}"><div class="rec-titulo">${rec.titulo}</div><div class="rec-detalle" style="white-space:pre-line">${rec.detalle}</div></div>` : ''}
+    ${acciones}
+  </div>`;
+}
+
+function responder(id,estado){
+  const obsEl=document.getElementById('obs_'+id);
+  const obs=obsEl?obsEl.value:'';
+  const inc=document.getElementById('inc_'+id);
+  inc.style.opacity='.5';inc.style.pointerEvents='none';
+  fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'responder',id,estado,observacion:obs,respuesta:obs})})
+  .then(r=>r.json())
+  .then(()=>setTimeout(()=>cargar(false),1500))
+  .catch(()=>{inc.style.opacity='1';inc.style.pointerEvents='auto';alert('Error. Intentá de nuevo.');});
+}
+
+// ACTUALIZAR STOCK Y VENTAS
+// FILTRO DE CONSERVA
+let filtroConserva = 'TODOS';
+
+function setFiltroConserva(val){
+  filtroConserva = val;
+  // Actualizar botones
+  ['TODOS','SECO','COSMETICA','CONGELADO','REFRIGERADO','CHOCOLATES'].forEach(k=>{
+    const btn = document.getElementById('filtro-'+k);
+    if(!btn) return;
+    if(k===val){
+      btn.style.background='var(--accent)';
+      btn.style.color='#fff';
+    } else {
+      btn.style.background='var(--surface)';
+      btn.style.color='var(--text)';
+    }
+  });
+  if(ultimosDatos.length>0) renderIncidencias(ultimosDatos);
+}
+
+// CARGAR ARTÍCULOS (con conserva)
+function cargarArticulos(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws);
+      let count=0;
+      for(const row of rows){
+        // Normalizar keys del row para evitar problemas de mayúsculas/minúsculas/tildes
+        const rowNorm={};
+        for(const k in row){ rowNorm[k.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')]=row[k]; }
+        // Saltar artículos bloqueados (columna "Bloqueado" = VERDADERO / TRUE)
+        const bloqueado=String(rowNorm['bloqueado']||'').trim().toUpperCase();
+        if(bloqueado==='VERDADERO'||bloqueado==='TRUE'||bloqueado==='1') continue;
+        // Saltar Rubros que no son productos reales: Promos y Combos, Otros (banners/informes), Insumos
+        const rubroRaw=String(rowNorm['rubro']||'').split(' - ')[0].trim().toUpperCase();
+        if(rubroRaw==='PROMOS Y COMBOS'||rubroRaw==='OTROS'||rubroRaw==='INSUMOS') continue;
+        // Saltar Muestras (por Familia o porque la descripción arranca con "Muestra")
+        const familiaRaw=String(rowNorm['familia']||'').split(' - ')[0].trim().toUpperCase();
+        const descRaw=String(rowNorm['descripcion']||rowNorm['descripción']||'').trim().toUpperCase();
+        if(familiaRaw==='MUESTRAS'||descRaw.startsWith('MUESTRA')) continue;
+        let ean=String(rowNorm['cod barras']||rowNorm['codbarras']||rowNorm['ean']||rowNorm['cod_barras']||'').trim();
+        // Normalizar EAN: si tiene 14 dígitos y empieza con 0, sacarle el 0 adelante
+        if(ean.length===14 && ean.startsWith('0')) ean=ean.slice(1);
+        const conservaRaw=String(rowNorm['conservacion']||'').split(' - ')[0].replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ]/g,'').trim().toUpperCase();
+        // vu se calcula abajo con rowNorm
+        const vu2=parseInt(rowNorm['vida util']||rowNorm['vu']||rowNorm['vida_util']||0);
+        const desc2=String(rowNorm['descripcion']||rowNorm['descripción']||'');
+        const marca2=String(rowNorm['marca']||'');
+        if(ean){
+          ART[ean]=ART[ean]||{};
+          if(conservaRaw) ART[ean].conserva=conservaRaw;
+          if(vu2){
+            ART[ean].vu=vu2;
+            // VU < 40 dias → 85% | VU >= 40 dias → 80%
+            const factor = vu2 < 40 ? 0.85 : 0.80;
+            ART[ean].vu_min = Math.round(vu2 * factor);
+          }
+          if(desc2) ART[ean].desc=desc2;
+          if(marca2) ART[ean].marca=marca2;
+          count++;
+        }
+      }
+      document.getElementById('articulos-status').innerHTML='<span style="color:var(--muted)">⏳ Guardando en Sheets (puede tardar unos segundos)...</span>';
+      // Enviar a Sheets en lotes de 500
+      const artArray = Object.entries(ART).map(([ean,v])=>({ean,desc:v.desc||'',marca:v.marca||'',vu:v.vu||0,vu_min:v.vu_min||0,conserva:v.conserva||''}));
+      const CHUNK = 500;
+      async function enviarArticulosEnLotes(){
+        for(let i=0;i<artArray.length;i+=CHUNK){
+          const lote=artArray.slice(i,i+CHUNK);
+          const esPrimero=(i===0);
+          await fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'guardar_articulos',articulos:lote,limpiar:esPrimero})});
+        }
+        document.getElementById('articulos-status').innerHTML='<span style="color:var(--green-text)">✔ Artículos actualizados: '+count+' registros — guardados en Sheets ✔</span>';
+        if(ultimosDatos.length>0) renderIncidencias(ultimosDatos);
+      }
+      enviarArticulosEnLotes().catch(()=>{document.getElementById('articulos-status').innerHTML='<span style="color:var(--green-text)">✔ Artículos actualizados: '+count+' registros (error al guardar en Sheets)</span>';});
+      input.value='';
+    }catch(err){
+      document.getElementById('articulos-status').innerHTML='<span style="color:var(--red-text)">⚠ Error al leer archivo</span>';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// VU_MIN en memoria — se carga del Excel de la calculadora
+var VU_MIN_LOCAL = {};
+
+function cargarVuMinima(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1});
+      let headerRow=-1, colEAN=-1, colVuMin=-1;
+      for(let i=0;i<Math.min(rows.length,20);i++){
+        const r=rows[i];
+        if(!r) continue;
+        for(let j=0;j<r.length;j++){
+          const v=String(r[j]||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+          if(v.includes('cod modelo')||v.includes('codigo')||v==='ean'||v.includes('cod_modelo')) colEAN=j;
+          if(v.includes('vu min')||v.includes('dias vu')||v.includes('minima')||v.includes('vu_min')) colVuMin=j;
+        }
+        if(colEAN>=0 && colVuMin>=0){ headerRow=i; break; }
+      }
+      if(headerRow<0||colEAN<0||colVuMin<0){
+        document.getElementById('vu-minima-status').innerHTML='<span style="color:var(--red-text)">⚠ No se encontraron columnas EAN/VU Mínima en el archivo</span>';
+        return;
+      }
+      VU_MIN_LOCAL={};
+      let count=0;
+      for(let i=headerRow+1;i<rows.length;i++){
+        const r=rows[i];
+        if(!r) continue;
+        const ean=String(r[colEAN]||'').trim();
+        const vuMin=parseInt(r[colVuMin]||0);
+        if(ean && vuMin){
+          VU_MIN_LOCAL[ean]=vuMin;
+          if(ART[ean]) ART[ean].vu_min=vuMin;
+          count++;
+        }
+      }
+      document.getElementById('vu-minima-status').innerHTML='<span style="color:var(--green-text)">✔ VU Mínima cargada: '+count+' artículos</span>';
+      if(ultimosDatos && ultimosDatos.length>0) renderIncidencias(ultimosDatos);
+    }catch(err){
+      document.getElementById('vu-minima-status').innerHTML='<span style="color:var(--red-text)">⚠ Error al leer archivo: '+err.message+'</span>';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function cargarStock(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws);
+      let count=0;
+      for(const row of rows){
+        const ean=String(row['Cód Bar']||row['Cod Bar']||row['EAN']||row['ean']||'').trim();
+        const disp=parseFloat(row['Disponible']||row['Stock']||row['stock']||0);
+        if(ean){ART[ean]=ART[ean]||{};ART[ean].stock=disp;count++;}
+      }
+      document.getElementById('stock-status').innerHTML='<span style="color:var(--muted)">⏳ Guardando stock en Sheets...</span>';
+      // Enviar stock a Sheets en lotes de 500
+      const stockArray = Object.entries(ART).filter(([e,v])=>v.stock!==undefined).map(([ean,v])=>({ean,stock:v.stock}));
+      async function enviarStockEnLotes(){
+        const CHUNK2=500;
+        for(let i=0;i<stockArray.length;i+=CHUNK2){
+          const lote=stockArray.slice(i,i+CHUNK2);
+          const esPrimero=(i===0);
+          await fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'guardar_stock',stock:lote,limpiar:esPrimero})});
+        }
+        document.getElementById('stock-status').innerHTML='<span style="color:var(--green-text)">✔ Stock actualizado: '+count+' artículos — guardado en Sheets ✔</span>';
+      }
+      enviarStockEnLotes().catch(()=>{document.getElementById('stock-status').innerHTML='<span style="color:var(--green-text)">✔ Stock actualizado: '+count+' artículos (error al guardar en Sheets)</span>';});
+      input.value='';
+    }catch(err){
+      document.getElementById('stock-status').innerHTML='<span style="color:var(--red-text)">⚠ Error al leer archivo</span>';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+
+function cargarStockDesdeSheets(){
+  const statusEl = document.getElementById('stock-status');
+  statusEl.innerHTML = '⏳ Cargando stock desde Sheets…';
+  fetch(SCRIPT_URL + '?tipo=stock&t=' + Date.now())
+  .then(r => r.json())
+  .then(stocks => {
+    let count = 0;
+    for(const ean in stocks){
+      if(!ART[ean]) ART[ean] = {};
+      ART[ean].stock = Number(stocks[ean]);
+      count++;
+    }
+    statusEl.innerHTML = '<span style="color:var(--green-text)">✔ Stock desde Sheets: ' + count + ' artículos</span>';
+    if(ultimosDatos.length > 0) renderIncidencias(ultimosDatos);
+  })
+  .catch(() => {
+    statusEl.innerHTML = '<span style="color:var(--red-text)">⚠ Error al cargar stock desde Sheets</span>';
+  });
+}
+
+function cargarVentasDesdeSheets(){
+  const statusEl = document.getElementById('ventas-status');
+  statusEl.innerHTML = '⏳ Cargando ventas desde Sheets…';
+  fetch(SCRIPT_URL + '?tipo=ventas&t=' + Date.now())
+  .then(r => r.json())
+  .then(ventas => {
+    let count = 0;
+    for(const ean in ventas){
+      if(ART[ean] !== undefined){
+        ART[ean].venta_sem = ventas[ean];
+      } else {
+        ART[ean] = ART[ean] || {};
+        ART[ean].venta_sem = ventas[ean];
+      }
+      count++;
+    }
+    statusEl.innerHTML = '<span style="color:var(--green-text)">✔ Ventas actualizadas automáticamente: ' + count + ' artículos</span>';
+  })
+  .catch(() => {
+    statusEl.innerHTML = '<span style="color:var(--red-text)">⚠ Error al cargar ventas. Intentá de nuevo.</span>';
+  });
+}
+
+// Mantener opción manual como respaldo
+function cargarVentas(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      let rows=[];
+      if(file.name.endsWith('.csv')){
+        const text=new TextDecoder('utf-8').decode(e.target.result);
+        const lines=text.split('\n');
+        const headers=lines[0].split(',').map(h=>h.trim().replace(/"/g,''));
+        rows=lines.slice(1).filter(l=>l.trim()).map(l=>{
+          const vals=l.split(',').map(v=>v.trim().replace(/"/g,''));
+          const obj={};headers.forEach((h,i)=>obj[h]=vals[i]);return obj;
+        });
+      } else {
+        const wb=XLSX.read(e.target.result,{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        rows=XLSX.utils.sheet_to_json(ws);
+      }
+      let count=0;
+      for(const row of rows){
+        const ean=String(row['cod_barras']||row['cod_barra']||row['EAN']||row['ean']||'').trim();
+        const s1=parseFloat(row['1_semana_atras']||row['1_semana']||0);
+        const s2=parseFloat(row['2_semanas_atras']||row['2_semana']||0);
+        const s3=parseFloat(row['3_semanas_atras']||row['3_semana']||0);
+        const s4=parseFloat(row['4_semanas_atras']||row['4_semana']||0);
+        const prom=Math.round(((s1+s2+s3+s4)/4)*10)/10;
+        if(ean){ART[ean]=ART[ean]||{};ART[ean].venta_sem=prom;count++;}
+      }
+      document.getElementById('ventas-status').innerHTML='<span style="color:var(--green-text)">✔ Ventas actualizadas: '+count+' artículos</span>';
+      input.value='';
+    }catch(err){
+      document.getElementById('ventas-status').innerHTML='<span style="color:var(--red-text)">⚠ Error al leer archivo</span>';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function consultarCompras(id, desc, ean, dias, cantidad, vuMin, vuOrig, stockMaer, stockSimulado){
+  // Registrar en Sheets como EN CONSULTA
+  responder(id, 'EN CONSULTA');
+  // Calcular porcentaje de VU y garantía
+  const pct = vuOrig ? Math.round((parseInt(dias) / parseInt(vuOrig)) * 100) : 'N/A';
+  const garantia = vuMin ? Math.round(parseInt(vuMin) * 0.7) : 'N/A';
+  // Armar mensaje de WhatsApp
+  const msg = 
+    '🔴 *CONSULTA DE RECEPCIÓN — FECHA CORTA*%0A%0A' +
+    '📦 *Producto:* ' + desc + '%0A' +
+    '🔢 *EAN:* ' + ean + '%0A' +
+    '📅 *Días restantes:* ' + dias + ' días%0A' +
+    '📊 *% de vida útil al ingresar:* ' + pct + '%25%0A' +
+    '📦 *Cantidad ingresando:* ' + (cantidad||'N/D') + ' u.%0A' +
+    '🏪 *Stock Maer + ingresando:* ' + stockMaer + ' + ' + (cantidad||0) + ' = ' + stockSimulado + ' u. simulado%0A' +
+    '⏱ *Garantía mínima al cliente:* ' + garantia + ' días%0A%0A' +
+    '¿Aceptamos o rechazamos? Por favor responder a la brevedad.';
+  // Abrir WhatsApp
+  window.open('https://wa.me/5491168505830?text=' + msg, '_blank');
+}
+
+function responderCambio(id, estado){
+  fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'responder_cambio',id,estado})})
+  .catch(()=>{});
+  const el=document.getElementById('cambio_'+id);
+  if(el){
+    const badge=el.querySelector('.badge');
+    if(badge){badge.className='badge '+(estado==='ACEPTADO'?'ACEPTADA':'RECHAZADA');badge.textContent=estado;}
+    const acc=el.querySelector('.acciones');
+    if(acc)acc.innerHTML='<div class="respuesta-dada">Respondido: '+estado+'</div>';
+  }
+  setTimeout(()=>cargar(false),1500);
+}
+
+function responderEAN(ean, estado){
+  const obsEl=document.getElementById('obs_ean_'+ean);
+  const obs=obsEl?obsEl.value:'';
+  const el=document.getElementById('ean_'+ean);
+  if(el){el.style.opacity='.5';el.style.pointerEvents='none';}
+  fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'responder_ean',ean,estado,observacion:obs})})
+  .then(()=>setTimeout(()=>cargar(false),1500))
+  .catch(()=>{if(el){el.style.opacity='1';el.style.pointerEvents='auto';}alert('Error. Intentá de nuevo.');});
+}
+
+cargar(true);
+cargarVentasDesdeSheets();
+cargarStockDesdeSheets();
+setInterval(()=>{
+  const activo=document.activeElement;
+  if(activo&&activo.classList.contains('obs-input'))return;
+  cargar(false);
+},30000);
+
+// ACTUALIZAR STOCK Y VENTAS
+let stockData = {};
+let ventasData = {};
+
+function cargarStock(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws);
+      stockData={};
+      let count=0;
+      for(const row of rows){
+        const ean=String(row['Cód Bar']||row['Cod Bar']||row['EAN']||row['ean']||'').trim();
+        const disp=parseFloat(row['Disponible']||row['Stock']||row['stock']||0);
+        if(ean){stockData[ean]=disp;count++;}
+      }
+      // Actualizar ART con nuevo stock
+      for(const ean in ART){
+        if(stockData[ean]!==undefined) ART[ean].stock=stockData[ean];
+      }
+      document.getElementById('stock-status').innerHTML='<span style="color:var(--muted)">⏳ Guardando stock en Sheets...</span>';
+      input.value='';
+      // Enviar a Sheets en lotes de 500
+      const stockArray=Object.entries(stockData).map(([ean,stock])=>({ean,stock}));
+      async function enviarStockLotes(){
+        const CHUNK=500;
+        for(let i=0;i<stockArray.length;i+=CHUNK){
+          const lote=stockArray.slice(i,i+CHUNK);
+          await fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'guardar_stock',stock:lote,limpiar:i===0})});
+        }
+        document.getElementById('stock-status').innerHTML='<span style="color:var(--green-text)">✔ Stock actualizado: '+count+' artículos — guardado en Sheets ✔</span>';
+      }
+      enviarStockLotes().catch(()=>{
+        document.getElementById('stock-status').innerHTML='<span style="color:var(--green-text)">✔ Stock actualizado: '+count+' artículos (error al guardar en Sheets)</span>';
+      });
+    }catch(err){
+      document.getElementById('stock-status').textContent='⚠ Error al leer archivo';
+      document.getElementById('stock-status').style.color='var(--red-text)';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function cargarVentas(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      let rows=[];
+      if(file.name.endsWith('.csv')){
+        const text=new TextDecoder('utf-8').decode(e.target.result);
+        const lines=text.split('\n');
+        const headers=lines[0].split(',').map(h=>h.trim().replace(/"/g,''));
+        rows=lines.slice(1).filter(l=>l.trim()).map(l=>{
+          const vals=l.split(',').map(v=>v.trim().replace(/"/g,''));
+          const obj={};
+          headers.forEach((h,i)=>obj[h]=vals[i]);
+          return obj;
+        });
+      } else {
+        const wb=XLSX.read(e.target.result,{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        rows=XLSX.utils.sheet_to_json(ws);
+      }
+      ventasData={};
+      let count=0;
+      for(const row of rows){
+        const ean=String(row['cod_barras']||row['cod_barra']||row['EAN']||row['ean']||'').trim();
+        const s1=parseFloat(row['1_semana_atras']||row['1_semana']||0);
+        const s2=parseFloat(row['2_semanas_atras']||row['2_semana']||0);
+        const s3=parseFloat(row['3_semanas_atras']||row['3_semana']||0);
+        const s4=parseFloat(row['4_semanas_atras']||row['4_semana']||0);
+        const prom=Math.round(((s1+s2+s3+s4)/4)*10)/10;
+        if(ean){ventasData[ean]=prom;count++;}
+      }
+      // Actualizar ART con nuevas ventas
+      for(const ean in ART){
+        if(ventasData[ean]!==undefined) ART[ean].venta_sem=ventasData[ean];
+      }
+      document.getElementById('ventas-status').textContent='✔ Ventas actualizadas: '+count+' artículos';
+      document.getElementById('ventas-status').style.color='var(--green-text)';
+      input.value='';
+    }catch(err){
+      document.getElementById('ventas-status').textContent='⚠ Error al leer archivo';
+      document.getElementById('ventas-status').style.color='var(--red-text)';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+</script>
+</body>
+</html>
