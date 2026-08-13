@@ -624,16 +624,24 @@ function extraerFecha(text){
   return null;
 }
 
-document.getElementById('fecha-venc').addEventListener('input',function(){
-  let v=this.value.replace(/\D/g,'');
+function formatearFechaInput(){
+  const campo=document.getElementById('fecha-venc');
+  let v=campo.value.replace(/\D/g,'');
   if(v.length>2)v=v.slice(0,2)+'/'+v.slice(2);
   if(v.length>5)v=v.slice(0,5)+'/'+v.slice(5);
-  this.value=v.slice(0,10);
+  const nuevoValor=v.slice(0,10);
+  if(campo.value!==nuevoValor) campo.value=nuevoValor;
   document.getElementById('fecha-error').classList.remove('visible');
   document.getElementById('veredictos').classList.remove('visible');
   document.getElementById('seccion-confirmar').style.display='none';
   document.getElementById('btn-cambios').style.display='none';
   document.getElementById('ocr-status').textContent='';
+}
+// Escuchar varios eventos (no solo "input") porque algunos lectores de
+// código de barras / teclados de dispositivos industriales no disparan
+// el evento "input" normal del navegador al escribir rápido.
+['input','keyup','paste','change'].forEach(ev=>{
+  document.getElementById('fecha-venc').addEventListener(ev, ()=>setTimeout(formatearFechaInput, 0));
 });
 document.getElementById('ean').addEventListener('keydown',e=>{if(e.key==='Enter')buscar();});
 document.getElementById('fecha-venc').addEventListener('keydown',e=>{if(e.key==='Enter')verificar();});
@@ -683,6 +691,7 @@ function buscar(){
 }
 
 function verificar(){
+  formatearFechaInput(); // por si escribieron sin que se disparara el autoformato
   const fechaStr=document.getElementById('fecha-venc').value.trim();
   if(!fechaStr||!currentEAN)return;
   const venc=parseFecha(fechaStr);
