@@ -278,25 +278,69 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwqK7NFDkCTBMaaFmuNjg14VyTYnM7IVLkfO_r3XzwZUEnEJ33UGfGmIcx_B9OYoypUvw/exec";
 let A = {};
 let catalogoCargado = false;
+const CATALOGO_CACHE_KEY = 'catalogo_cache_v1';
+
+function fechaHoyCache(){
+  const d=new Date();
+  return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+}
+
+function guardarCatalogoEnCache(data){
+  try{
+    localStorage.setItem(CATALOGO_CACHE_KEY, JSON.stringify({fecha:fechaHoyCache(), data}));
+  }catch(e){ /* si no entra en localStorage (muy grande), no pasa nada grave */ }
+}
+
+function cargarCatalogoDesdeCache(){
+  try{
+    const raw=localStorage.getItem(CATALOGO_CACHE_KEY);
+    if(!raw)return null;
+    const parsed=JSON.parse(raw);
+    if(parsed.fecha!==fechaHoyCache())return null; // caché de otro día, no sirve
+    return parsed.data;
+  }catch(e){ return null; }
+}
+
+function aplicarCatalogo(data){
+  for (const [ean, v] of Object.entries(data)) {
+    A[ean] = {
+      desc: v.desc || '',
+      marca: v.marca || '',
+      vu: Number(v.vu) || 0,
+      vu_min: v.vu_min ? Number(v.vu_min) : null,
+      conserva: v.conserva || '',
+      stock: Number(v.stock) || 0,
+      venta_sem: v.venta_sem !== undefined ? v.venta_sem : null
+    };
+  }
+}
 
 async function cargarCatalogo(intento) {
   intento = intento || 1;
   const el = document.getElementById('catalogo-info');
+
+  // 1) Si hay caché de HOY, lo usamos de entrada — carga instantánea,
+  // sin esperar a internet ni al procesamiento de miles de productos.
+  if (intento === 1 && !catalogoCargado) {
+    const cache = cargarCatalogoDesdeCache();
+    if (cache) {
+      aplicarCatalogo(cache);
+      catalogoCargado = true;
+      if (el) el.textContent = '✔ ' + Object.keys(A).length + ' artículos cargados (caché de hoy)';
+      // Igual pedimos la versión fresca en segundo plano, para no quedarnos
+      // con stock/incidencias desactualizados durante el día — pero esto
+      // ya no bloquea al operario, que puede escanear de inmediato.
+      actualizarCatalogoEnSegundoPlano();
+      return;
+    }
+  }
+
   if (el) el.innerHTML = '⏳ Cargando catálogo... (intento ' + intento + ')';
   try {
     const r = await fetch(SCRIPT_URL + '?tipo=catalogo&t=' + Date.now());
     const data = await r.json();
-    for (const [ean, v] of Object.entries(data)) {
-      A[ean] = {
-        desc: v.desc || '',
-        marca: v.marca || '',
-        vu: Number(v.vu) || 0,
-        vu_min: v.vu_min ? Number(v.vu_min) : null,
-        conserva: v.conserva || '',
-        stock: Number(v.stock) || 0,
-        venta_sem: v.venta_sem !== undefined ? v.venta_sem : null
-      };
-    }
+    aplicarCatalogo(data);
+    guardarCatalogoEnCache(data);
     catalogoCargado = true;
     console.log('Catálogo cargado:', Object.keys(A).length, 'artículos');
     if (el) el.textContent = '✔ ' + Object.keys(A).length + ' artículos cargados';
@@ -308,6 +352,20 @@ async function cargarCatalogo(intento) {
       if (el) el.innerHTML = '⚠ Sin conexión a catálogo &nbsp; <button onclick="cargarCatalogo(1)" style="background:#000;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer">🔄 Reintentar</button>';
     }
   }
+}
+
+// Actualiza el catálogo sin bloquear la pantalla — si el operario ya está
+// escaneando con el caché de hoy, esto corre atrás y actualiza cuando llega.
+function actualizarCatalogoEnSegundoPlano(){
+  fetch(SCRIPT_URL + '?tipo=catalogo&t=' + Date.now())
+    .then(r => r.json())
+    .then(data => {
+      aplicarCatalogo(data);
+      guardarCatalogoEnCache(data);
+      const el = document.getElementById('catalogo-info');
+      if (el) el.textContent = '✔ ' + Object.keys(A).length + ' artículos cargados';
+    })
+    .catch(() => { /* si falla, seguimos con lo que ya está en caché */ });
 }
 let currentEAN = null;
 let hayRechazo = false;
@@ -697,46 +755,94 @@ function eliminarBandeja(idx){
   renderBandeja();
 }
 
-function enviarBandeja(){
-  if(bandeja.length===0)return;
-  const btn=document.querySelector('.btn-enviar-bandeja');
-  btn.textContent='Enviando…';btn.disabled=true;
-  // Enviar todas las incidencias independientemente (si una falla no afecta a las demás)
-  const promesas=bandeja.map(item=>
-    fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({
+function enviarUnaIncidencia(item){
+  return fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({
       accion:'nueva',fecha:fechaHoyStr,operario:document.getElementById('nombre-operario').value.trim()||getNombreOperario(),
       ean:item.ean,descripcion:item.descripcion,marca:item.marca,
       vu_orig:item.vu_orig,vu_min:item.vu_min,
       dias:item.dias,cantidad:item.cantidad
     })})
-    .then(r=>r.json())
+    .then(r=>{ if(!r.ok) throw new Error('http '+r.status); return r.json(); })
     .then(data=>{
-      const id=Date.now()+Math.random();
+      if(!data || data.ok!==true) throw new Error('respuesta invalida');
       const histItem={
-        id,ean:item.ean,descripcion:item.descripcion,marca:item.marca,
+        id:Date.now()+Math.random(),ean:item.ean,descripcion:item.descripcion,marca:item.marca,
         fecha_vto:item.fecha_vto,dias:item.dias,cantidad:item.cantidad,
         resultado:'FECHA CORTA',incidenciaId:String(data.id),estado:'PENDIENTE'
       };
       guardarLocal(histItem);
+      return {ok:true};
     })
-    .catch(()=>{
-      // Si falla una, igual guardamos localmente con incidenciaId vacío para reintento
-      const histItem={
-        id:Date.now()+Math.random(),ean:item.ean,descripcion:item.descripcion,marca:item.marca,
-        fecha_vto:item.fecha_vto,dias:item.dias,cantidad:item.cantidad,
-        resultado:'FECHA CORTA',incidenciaId:'',estado:'PENDIENTE'
-      };
-      guardarLocal(histItem);
-    })
-  );
-  Promise.allSettled(promesas).then(()=>{
-    bandeja=[];
+    .catch(()=>{ return {ok:false}; });
+}
+
+function enviarBandeja(){
+  if(bandeja.length===0)return;
+  const btn=document.querySelector('.btn-enviar-bandeja');
+  btn.textContent='Enviando…';btn.disabled=true;
+  const promesas=bandeja.map(item=>enviarUnaIncidencia(item).then(res=>({item,ok:res.ok})));
+  Promise.allSettled(promesas).then(resultados=>{
+    const fallidas=[];
+    resultados.forEach(r=>{
+      if(r.status==='fulfilled' && !r.value.ok){ r.value.item.fallo=true; fallidas.push(r.value.item); }
+    });
+    bandeja=fallidas;
     renderBandeja();
     renderHistorial();
-    btn.textContent='📢 Enviar todas las incidencias a Recepciones';
-    btn.disabled=false;
+    if(fallidas.length>0){
+      btn.textContent='⚠ '+fallidas.length+' sin enviar — Tocá para reintentar';
+      btn.disabled=false;
+    } else {
+      btn.textContent='📢 Enviar todas las incidencias a Recepciones';
+      btn.disabled=false;
+    }
   });
 }
+
+// Reintento automático genérico: revisa localStorage por incidencias Y por
+// EAN desconocidos que quedaron sin confirmar el envío al servidor, y los
+// reintenta solos, sin que el operario tenga que hacer nada.
+function reintentarPendientesPerdidos(){
+  const items=cargarLocal();
+  const perdidas=items.filter(i=>i.resultado==='FECHA CORTA' && !i.incidenciaId);
+  perdidas.forEach(p=>{
+    enviarUnaIncidencia({
+      ean:p.ean,descripcion:p.descripcion,marca:p.marca,
+      fecha_vto:p.fecha_vto,dias:p.dias,cantidad:p.cantidad,
+      vu_orig:p.vu_orig||'',vu_min:p.vu_min||''
+    }).then(res=>{
+      if(res.ok){
+        try{
+          const key='hist_'+fechaHoyStr.replace(/\//g,'_');
+          const actuales=JSON.parse(localStorage.getItem(key)||'[]');
+          const filtrados=actuales.filter(x=>x.id!==p.id);
+          localStorage.setItem(key,JSON.stringify(filtrados));
+          renderHistorial();
+        }catch(e){}
+      }
+    });
+  });
+
+  const eansPendientes=items.filter(i=>i.resultado==='EAN DESCONOCIDO' && !i.confirmado);
+  eansPendientes.forEach(p=>{
+    fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({
+      accion:'ean_desconocido',fecha:fechaHoyStr,ean:p.ean,descripcion:p.descripcion,marca:p.marca,cantidad:p.cantidad,operario:getNombreOperario()
+    })})
+    .then(r=>{ if(!r.ok) throw new Error(); return r.json(); })
+    .then(data=>{
+      if(!data || data.ok!==true) throw new Error();
+      try{
+        const key='hist_'+fechaHoyStr.replace(/\//g,'_');
+        const actuales=JSON.parse(localStorage.getItem(key)||'[]');
+        const idx=actuales.findIndex(x=>x.id===p.id);
+        if(idx>-1){ actuales[idx].confirmado=true; localStorage.setItem(key,JSON.stringify(actuales)); renderHistorial(); }
+      }catch(e){}
+    })
+    .catch(()=>{});
+  });
+}
+window.addEventListener('online', reintentarPendientesPerdidos);
+setTimeout(reintentarPendientesPerdidos, 3000);
 
 let reportandoEAN = false;
 // ─── POLLING CAMBIOS REPORTADOS ──────────────────────────────────────────────
@@ -908,15 +1014,29 @@ function reportarEAN(){
   const btn=document.querySelector('.btn-report');
   btn.textContent='Enviando…';btn.disabled=true;
   const cantidad=document.getElementById('nf-cantidad')?document.getElementById('nf-cantidad').value||'':'';
-  // Guardar localmente primero sin esperar al servidor
+  // Guardar localmente primero sin esperar al servidor. "confirmado" queda en
+  // false hasta que el servidor confirme que lo recibió — si falla el envío,
+  // el reintento automático (reintentarPendientesPerdidos) lo va a reintentar
+  // solo, sin que se pierda ni haya que volver a tipear nada.
   const id=Date.now();
-  guardarLocal({id,ean,descripcion:desc,marca,fecha_vto:'–',dias:'–',cantidad:cantidad||'–',resultado:'EAN DESCONOCIDO'});
+  guardarLocal({id,ean,descripcion:desc,marca,fecha_vto:'–',dias:'–',cantidad:cantidad||'–',resultado:'EAN DESCONOCIDO',confirmado:false});
   renderHistorial();
   document.getElementById('report-ok').classList.add('visible');
-  // Enviar al servidor en segundo plano
+  // Enviar al servidor en segundo plano, con confirmación real
   fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({
     accion:'ean_desconocido',fecha:fechaHoyStr,ean,descripcion:desc,marca,cantidad,operario:getNombreOperario()
-  })}).catch(()=>{});
+  })})
+  .then(r=>{ if(!r.ok) throw new Error(); return r.json(); })
+  .then(data=>{
+    if(!data || data.ok!==true) throw new Error();
+    try{
+      const key='hist_'+fechaHoyStr.replace(/\//g,'_');
+      const actuales=JSON.parse(localStorage.getItem(key)||'[]');
+      const idx=actuales.findIndex(x=>x.id===id);
+      if(idx>-1){ actuales[idx].confirmado=true; localStorage.setItem(key,JSON.stringify(actuales)); renderHistorial(); }
+    }catch(e){}
+  })
+  .catch(()=>{ /* queda confirmado:false — el reintento automático se encarga */ });
   setTimeout(()=>{
     document.getElementById('ean').value='';
     resetResult();
