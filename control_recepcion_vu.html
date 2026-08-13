@@ -336,7 +336,7 @@ async function cargarCatalogo(intento) {
     if (cache) {
       aplicarCatalogo(cache);
       catalogoCargado = true;
-      if (el) el.textContent = '✔ ' + Object.keys(A).length + ' artículos cargados (caché de hoy)';
+      if (el) el.innerHTML = '✔ ' + Object.keys(A).length + ' artículos cargados (caché de hoy) &nbsp; <button onclick="forzarActualizacionTotal()" style="background:#000;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer">🔄 Actualizar</button>';
       actualizarCatalogoEnSegundoPlano();
       return;
     }
@@ -372,6 +372,16 @@ function actualizarCatalogoEnSegundoPlano(){
     })
     .catch(() => { /* si falla, seguimos con lo que ya está en caché */ });
 }
+// Borra el caché del catálogo Y fuerza que el navegador vuelva a descargar
+// la página completa desde GitHub (no una copia vieja guardada), y vuelve
+// a cargar todo de cero. Un solo botón para "arrancar de nuevo" sin tener
+// que entrar a Ajustes del celular.
+function forzarActualizacionTotal(){
+  try{ localStorage.removeItem(CATALOGO_CACHE_KEY); }catch(e){}
+  const url = window.location.href.split('?')[0] + '?forzar=' + Date.now();
+  window.location.href = url;
+}
+
 let currentEAN = null;
 let hayRechazo = false;
 let diasActual = null;
