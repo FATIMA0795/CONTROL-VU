@@ -554,9 +554,15 @@ function cargarArticulos(input){
         // Normalizar keys del row para evitar problemas de mayúsculas/minúsculas/tildes
         const rowNorm={};
         for(const k in row){ rowNorm[k.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')]=row[k]; }
-        // Saltar artículos bloqueados (columna "Bloqueado" = VERDADERO / TRUE)
+        // Ya NO filtramos nada aquí — se manda todo crudo, con las columnas
+        // de control (bloqueado/rubro/familia), y el Apps Script decide
+        // centralmente qué mostrar en el catálogo. Así el filtro es siempre
+        // consistente para todos los depósitos, sin depender de qué versión
+        // del panel/navegador se usó para cargar el Excel.
         const bloqueado=String(rowNorm['bloqueado']||'').trim().toUpperCase();
-        if(bloqueado==='VERDADERO'||bloqueado==='TRUE'||bloqueado==='1') continue;
+        const esBloqueado=(bloqueado==='VERDADERO'||bloqueado==='TRUE'||bloqueado==='1')?'1':'0';
+        const rubroRaw=String(rowNorm['rubro']||'').split(' - ')[0].trim().toUpperCase();
+        const familiaRaw=String(rowNorm['familia']||'').split(' - ')[0].trim().toUpperCase();
         let ean=String(rowNorm['cod barras']||rowNorm['codbarras']||rowNorm['ean']||rowNorm['cod_barras']||'').trim();
         // Normalizar EAN: si tiene 14 dígitos y empieza con 0, sacarle el 0 adelante
         if(ean.length===14 && ean.startsWith('0')) ean=ean.slice(1);
@@ -576,12 +582,15 @@ function cargarArticulos(input){
           }
           if(desc2) ART[ean].desc=desc2;
           if(marca2) ART[ean].marca=marca2;
+          ART[ean].bloqueado=esBloqueado;
+          ART[ean].rubro=rubroRaw;
+          ART[ean].familia=familiaRaw;
           count++;
         }
       }
       document.getElementById('articulos-status').innerHTML='<span style="color:var(--muted)">⏳ Guardando en Sheets (puede tardar unos segundos)...</span>';
-      // Enviar a Sheets en lotes de 500
-      const artArray = Object.entries(ART).map(([ean,v])=>({ean,desc:v.desc||'',marca:v.marca||'',vu:v.vu||0,vu_min:v.vu_min||0,conserva:v.conserva||''}));
+      // Enviar a Sheets en lotes de 500 (con las columnas de control incluidas)
+      const artArray = Object.entries(ART).map(([ean,v])=>({ean,desc:v.desc||'',marca:v.marca||'',vu:v.vu||0,vu_min:v.vu_min||0,conserva:v.conserva||'',bloqueado:v.bloqueado||'0',rubro:v.rubro||'',familia:v.familia||''}));
       const CHUNK = 500;
       async function enviarArticulosEnLotes(){
         for(let i=0;i<artArray.length;i+=CHUNK){
