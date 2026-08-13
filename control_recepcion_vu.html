@@ -542,6 +542,7 @@ function pollIncidencias(){
 }
 cargarCatalogo();
 setInterval(pollIncidencias,2000);
+if (bandeja.length > 0) renderBandeja(); // mostrar lo que quedó pendiente de una sesión anterior
 
 // TESSERACT OCR OPTIMIZADO
 async function procesarFoto(input){
@@ -708,18 +709,44 @@ function confirmarRecepcion(){
   const cantidad=document.getElementById('cantidad').value||'';
   const resultado=hayRechazo?'FECHA CORTA':'OK';
   const id=Date.now();
-  const item={id,ean:currentEAN,descripcion:art.desc,marca:art.marca,fecha_vto:fechaVtoActual,dias:diasActual,cantidad,resultado};
+  const item={id,ean:currentEAN,descripcion:art.desc,marca:art.marca,fecha_vto:fechaVtoActual,dias:diasActual,cantidad,resultado,confirmado:false};
   const opNombre = document.getElementById('nombre-operario').value.trim() || getNombreOperario();
   localStorage.setItem('nombre_operario', opNombre);
-  fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'registrar',fecha:fechaHoyStr,operario:opNombre,...item})})
-  .then(()=>{guardarLocal(item);renderHistorial();document.getElementById('ean').value='';resetResult();focoEAN();})
-  .catch(()=>alert('Error al guardar.'));
+  // Guardar localmente PRIMERO, sin esperar al servidor — así el escaneo
+  // nunca se pierde ni hay que repetirlo, pase lo que pase con la conexión.
+  guardarLocal(item);
+  renderHistorial();
+  document.getElementById('ean').value='';
+  resetResult();
+  focoEAN();
+  fetchConTimeout(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'registrar',fecha:fechaHoyStr,operario:opNombre,...item})}, 15000)
+  .then(r=>{ if(!r.ok) throw new Error(); marcarRegistroConfirmado(id); })
+  .catch(()=>{ /* queda confirmado:false — el reintento automático lo va a reenviar solo */ });
+}
+
+function marcarRegistroConfirmado(id){
+  try{
+    const key='hist_'+fechaHoyStr.replace(/\//g,'_');
+    const actuales=JSON.parse(localStorage.getItem(key)||'[]');
+    const idx=actuales.findIndex(x=>x.id===id);
+    if(idx>-1){ actuales[idx].confirmado=true; localStorage.setItem(key,JSON.stringify(actuales)); }
+  }catch(e){}
 }
 
 // BANDEJA DE INCIDENCIAS
-let bandeja = [];
+const BANDEJA_KEY = 'bandeja_pendiente_v1';
+let bandeja = cargarBandejaDesdeStorage();
+let enviandoBandeja = false;
+
+function guardarBandejaEnStorage(){
+  try{ localStorage.setItem(BANDEJA_KEY, JSON.stringify(bandeja)); }catch(e){}
+}
+function cargarBandejaDesdeStorage(){
+  try{ return JSON.parse(localStorage.getItem(BANDEJA_KEY) || '[]'); }catch(e){ return []; }
+}
 
 function renderBandeja(){
+  guardarBandejaEnStorage();
   const el=document.getElementById('bandeja-lista');
   const card=document.getElementById('bandeja-card');
   document.getElementById('bandeja-count').textContent=bandeja.length;
@@ -736,20 +763,28 @@ function renderBandeja(){
 function avisarIncidencia(){
   const art=A[currentEAN];
   const cantidad=document.getElementById('cantidad').value||'';
-  // Agregar a la bandeja local sin enviar todavía
+  // Agregar a la bandeja local sin enviar todavía (esto ya está protegido
+  // por enviarBandeja/enviarUnaIncidencia con reintentos)
   const item={
     ean:currentEAN,descripcion:art.desc,marca:art.marca,
     fecha_vto:fechaVtoActual,dias:diasActual,cantidad,
     vu_orig:art.vu,vu_min:art.vu_min||''
   };
   bandeja.push(item);
-  // Registrar en historial como fecha corta
-  fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({
+  // Registrar también en el historial local de "Recepciones" (para que quede
+  // el registro aunque la incidencia en sí todavía no se haya enviado).
+  const idHist=Date.now()+Math.random();
+  const histItem={id:idHist,ean:currentEAN,descripcion:art.desc,marca:art.marca,fecha_vto:fechaVtoActual,dias:diasActual,cantidad,resultado:'FECHA CORTA',confirmado:false};
+  guardarLocal(histItem);
+  fetchConTimeout(SCRIPT_URL,{method:'POST',body:JSON.stringify({
     accion:'registrar',fecha:fechaHoyStr,operario:document.getElementById('nombre-operario').value.trim()||getNombreOperario(),ean:currentEAN,
     descripcion:art.desc,marca:art.marca,fecha_vto:fechaVtoActual,
     dias:diasActual,cantidad,resultado:'FECHA CORTA'
-  })});
+  })}, 15000)
+  .then(r=>{ if(!r.ok) throw new Error(); marcarRegistroConfirmado(idHist); })
+  .catch(()=>{ /* el reintento automático lo va a reenviar solo */ });
   renderBandeja();
+  renderHistorial();
   document.getElementById('ean').value='';
   resetResult();
   focoEAN();
@@ -782,9 +817,10 @@ function enviarUnaIncidencia(item){
 }
 
 function enviarBandeja(){
-  if(bandeja.length===0)return;
+  if(bandeja.length===0||enviandoBandeja)return;
+  enviandoBandeja=true;
   const btn=document.querySelector('.btn-enviar-bandeja');
-  btn.textContent='Enviando…';btn.disabled=true;
+  if(btn){btn.textContent='Enviando…';btn.disabled=true;}
   const promesas=bandeja.map(item=>enviarUnaIncidencia(item).then(res=>({item,ok:res.ok})));
   Promise.allSettled(promesas).then(resultados=>{
     const fallidas=[];
@@ -792,8 +828,10 @@ function enviarBandeja(){
       if(r.status==='fulfilled' && !r.value.ok){ r.value.item.fallo=true; fallidas.push(r.value.item); }
     });
     bandeja=fallidas;
+    enviandoBandeja=false;
     renderBandeja();
     renderHistorial();
+    if(!btn)return;
     if(fallidas.length>0){
       btn.textContent='⚠ '+fallidas.length+' sin enviar — Tocá para reintentar';
       btn.disabled=false;
@@ -806,7 +844,22 @@ function enviarBandeja(){
 
 function reintentarPendientesPerdidos(){
   const items=cargarLocal();
-  const perdidas=items.filter(i=>i.resultado==='FECHA CORTA' && !i.incidenciaId);
+
+  // Si quedaron incidencias sin enviar en la bandeja (por ejemplo, se cerró
+  // la página antes de que terminaran de mandarse), reintentar solas.
+  if (bandeja.length > 0 && !enviandoBandeja) {
+    enviarBandeja();
+  }
+
+  // Registros de recepción (OK o fecha corta) que nunca confirmó el servidor
+  const registrosPendientes=items.filter(i=>(i.resultado==='OK'||i.resultado==='FECHA CORTA') && i.confirmado===false && i.ean);
+  registrosPendientes.forEach(p=>{
+    fetchConTimeout(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'registrar',fecha:fechaHoyStr,operario:getNombreOperario(),...p})}, 15000)
+    .then(r=>{ if(!r.ok) throw new Error(); marcarRegistroConfirmado(p.id); })
+    .catch(()=>{});
+  });
+
+  const perdidas=items.filter(i=>i.resultado==='FECHA CORTA' && !i.incidenciaId && i.confirmado===undefined);
   perdidas.forEach(p=>{
     enviarUnaIncidencia({
       ean:p.ean,descripcion:p.descripcion,marca:p.marca,
