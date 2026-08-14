@@ -558,7 +558,6 @@ function pollIncidencias(){
 }
 cargarCatalogo();
 setInterval(pollIncidencias,2000);
-if (bandeja.length > 0) renderBandeja(); // mostrar lo que quedó pendiente de una sesión anterior
 
 // TESSERACT OCR OPTIMIZADO
 async function procesarFoto(input){
@@ -769,6 +768,7 @@ function marcarRegistroConfirmado(id){
 const BANDEJA_KEY = 'bandeja_pendiente_v1';
 let bandeja = cargarBandejaDesdeStorage();
 let enviandoBandeja = false;
+if (bandeja.length > 0) renderBandeja(); // mostrar lo que quedó pendiente de una sesión anterior
 
 function guardarBandejaEnStorage(){
   try{ localStorage.setItem(BANDEJA_KEY, JSON.stringify(bandeja)); }catch(e){}
