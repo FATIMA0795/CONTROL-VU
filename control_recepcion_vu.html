@@ -282,6 +282,12 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwqK7NFDkCTBMaaFmuNj
 // siempre — así el reintento automático puede entrar en acción.
 function fetchConTimeout(url, opciones, ms) {
   ms = ms || 15000;
+  // Si el navegador es muy viejo y no tiene AbortController (pasa en algunos
+  // celulares industriales/colectores con Android muy antiguo), usamos fetch
+  // normal sin límite de tiempo, en vez de romper toda la función.
+  if (typeof AbortController === 'undefined') {
+    return fetch(url, opciones || {});
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
   return fetch(url, Object.assign({}, opciones, { signal: controller.signal }))
@@ -724,23 +730,30 @@ function verificar(){
 }
 
 function confirmarRecepcion(){
-  const art=A[currentEAN];
-  const cantidad=document.getElementById('cantidad').value||'';
-  const resultado=hayRechazo?'FECHA CORTA':'OK';
-  const id=Date.now();
-  const item={id,ean:currentEAN,descripcion:art.desc,marca:art.marca,fecha_vto:fechaVtoActual,dias:diasActual,cantidad,resultado,confirmado:false};
-  const opNombre = document.getElementById('nombre-operario').value.trim() || getNombreOperario();
-  localStorage.setItem('nombre_operario', opNombre);
-  // Guardar localmente PRIMERO, sin esperar al servidor — así el escaneo
-  // nunca se pierde ni hay que repetirlo, pase lo que pase con la conexión.
-  guardarLocal(item);
-  renderHistorial();
-  document.getElementById('ean').value='';
-  resetResult();
-  focoEAN();
-  fetchConTimeout(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'registrar',fecha:fechaHoyStr,operario:opNombre,...item})}, 15000)
-  .then(r=>{ if(!r.ok) throw new Error(); marcarRegistroConfirmado(id); })
-  .catch(()=>{ /* queda confirmado:false — el reintento automático lo va a reenviar solo */ });
+  try{
+    if(!currentEAN || !A[currentEAN]){
+      alert('No se pudo procesar: no hay un producto escaneado válido en este momento. Volvé a escanear el EAN.');
+      return;
+    }
+    const art=A[currentEAN];
+    const cantidad=document.getElementById('cantidad').value||'';
+    const resultado=hayRechazo?'FECHA CORTA':'OK';
+    const id=Date.now();
+    const item={id,ean:currentEAN,descripcion:art.desc,marca:art.marca,fecha_vto:fechaVtoActual,dias:diasActual,cantidad,resultado,confirmado:false};
+    const opNombre = document.getElementById('nombre-operario').value.trim() || getNombreOperario();
+    localStorage.setItem('nombre_operario', opNombre);
+    guardarLocal(item);
+    renderHistorial();
+    document.getElementById('ean').value='';
+    resetResult();
+    focoEAN();
+    fetchConTimeout(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'registrar',fecha:fechaHoyStr,operario:opNombre,...item})}, 15000)
+    .then(r=>{ if(!r.ok) throw new Error(); marcarRegistroConfirmado(id); })
+    .catch(()=>{ /* queda confirmado:false — el reintento automático lo va a reenviar solo */ });
+  }catch(err){
+    alert('Ocurrió un error al confirmar la recepción: '+err.message+'\n\nAvisale a Fátima con este mensaje de error.');
+    console.error('Error en confirmarRecepcion:', err);
+  }
 }
 
 function marcarRegistroConfirmado(id){
@@ -780,33 +793,38 @@ function renderBandeja(){
 }
 
 function avisarIncidencia(){
-  const art=A[currentEAN];
-  const cantidad=document.getElementById('cantidad').value||'';
-  // Agregar a la bandeja local sin enviar todavía (esto ya está protegido
-  // por enviarBandeja/enviarUnaIncidencia con reintentos)
-  const item={
-    ean:currentEAN,descripcion:art.desc,marca:art.marca,
-    fecha_vto:fechaVtoActual,dias:diasActual,cantidad,
-    vu_orig:art.vu,vu_min:art.vu_min||''
-  };
-  bandeja.push(item);
-  // Registrar también en el historial local de "Recepciones" (para que quede
-  // el registro aunque la incidencia en sí todavía no se haya enviado).
-  const idHist=Date.now()+Math.random();
-  const histItem={id:idHist,ean:currentEAN,descripcion:art.desc,marca:art.marca,fecha_vto:fechaVtoActual,dias:diasActual,cantidad,resultado:'FECHA CORTA',confirmado:false};
-  guardarLocal(histItem);
-  fetchConTimeout(SCRIPT_URL,{method:'POST',body:JSON.stringify({
-    accion:'registrar',fecha:fechaHoyStr,operario:document.getElementById('nombre-operario').value.trim()||getNombreOperario(),ean:currentEAN,
-    descripcion:art.desc,marca:art.marca,fecha_vto:fechaVtoActual,
-    dias:diasActual,cantidad,resultado:'FECHA CORTA'
-  })}, 15000)
-  .then(r=>{ if(!r.ok) throw new Error(); marcarRegistroConfirmado(idHist); })
-  .catch(()=>{ /* el reintento automático lo va a reenviar solo */ });
-  renderBandeja();
-  renderHistorial();
-  document.getElementById('ean').value='';
-  resetResult();
-  focoEAN();
+  try{
+    if(!currentEAN || !A[currentEAN]){
+      alert('No se pudo procesar: no hay un producto escaneado válido en este momento. Volvé a escanear el EAN.');
+      return;
+    }
+    const art=A[currentEAN];
+    const cantidad=document.getElementById('cantidad').value||'';
+    const item={
+      ean:currentEAN,descripcion:art.desc,marca:art.marca,
+      fecha_vto:fechaVtoActual,dias:diasActual,cantidad,
+      vu_orig:art.vu,vu_min:art.vu_min||''
+    };
+    bandeja.push(item);
+    const idHist=Date.now()+Math.random();
+    const histItem={id:idHist,ean:currentEAN,descripcion:art.desc,marca:art.marca,fecha_vto:fechaVtoActual,dias:diasActual,cantidad,resultado:'FECHA CORTA',confirmado:false};
+    guardarLocal(histItem);
+    fetchConTimeout(SCRIPT_URL,{method:'POST',body:JSON.stringify({
+      accion:'registrar',fecha:fechaHoyStr,operario:document.getElementById('nombre-operario').value.trim()||getNombreOperario(),ean:currentEAN,
+      descripcion:art.desc,marca:art.marca,fecha_vto:fechaVtoActual,
+      dias:diasActual,cantidad,resultado:'FECHA CORTA'
+    })}, 15000)
+    .then(r=>{ if(!r.ok) throw new Error(); marcarRegistroConfirmado(idHist); })
+    .catch(()=>{ /* el reintento automático lo va a reenviar solo */ });
+    renderBandeja();
+    renderHistorial();
+    document.getElementById('ean').value='';
+    resetResult();
+    focoEAN();
+  }catch(err){
+    alert('Ocurrió un error al avisar la incidencia: '+err.message+'\n\nEl escaneo NO se perdió, está en el historial. Avisale a Fátima con este mensaje de error.');
+    console.error('Error en avisarIncidencia:', err);
+  }
 }
 
 function eliminarBandeja(idx){
