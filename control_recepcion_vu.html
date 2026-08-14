@@ -853,30 +853,30 @@ function enviarUnaIncidencia(item){
     .catch(()=>{ return {ok:false}; });
 }
 
-function enviarBandeja(){
+async function enviarBandeja(){
   if(bandeja.length===0||enviandoBandeja)return;
   enviandoBandeja=true;
   const btn=document.querySelector('.btn-enviar-bandeja');
-  if(btn){btn.textContent='Enviando…';btn.disabled=true;}
-  const promesas=bandeja.map(item=>enviarUnaIncidencia(item).then(res=>({item,ok:res.ok})));
-  Promise.allSettled(promesas).then(resultados=>{
-    const fallidas=[];
-    resultados.forEach(r=>{
-      if(r.status==='fulfilled' && !r.value.ok){ r.value.item.fallo=true; fallidas.push(r.value.item); }
-    });
-    bandeja=fallidas;
-    enviandoBandeja=false;
-    renderBandeja();
-    renderHistorial();
-    if(!btn)return;
-    if(fallidas.length>0){
-      btn.textContent='⚠ '+fallidas.length+' sin enviar — Tocá para reintentar';
-      btn.disabled=false;
-    } else {
-      btn.textContent='📢 Enviar todas las incidencias a Recepciones';
-      btn.disabled=false;
-    }
-  });
+  const pendientes=bandeja.slice();
+  const fallidas=[];
+  for(let i=0;i<pendientes.length;i++){
+    if(btn){btn.textContent='Enviando… ('+(i+1)+'/'+pendientes.length+')';btn.disabled=true;}
+    const item=pendientes[i];
+    const res=await enviarUnaIncidencia(item);
+    if(!res.ok){ item.fallo=true; fallidas.push(item); }
+  }
+  bandeja=fallidas;
+  enviandoBandeja=false;
+  renderBandeja();
+  renderHistorial();
+  if(!btn)return;
+  if(fallidas.length>0){
+    btn.textContent='⚠ '+fallidas.length+' sin enviar — Tocá para reintentar';
+    btn.disabled=false;
+  } else {
+    btn.textContent='📢 Enviar todas las incidencias a Recepciones';
+    btn.disabled=false;
+  }
 }
 
 function reintentarPendientesPerdidos(){
