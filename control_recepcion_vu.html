@@ -439,6 +439,18 @@ function actualizarLocalItem(id,estado,obs){
     if(idx>=0){items[idx].estado=estado;items[idx].obs=obs;localStorage.setItem(key,JSON.stringify(items));}
   }catch(e){}
 }
+// Actualiza el MISMO registro local (por su id propio) en vez de crear uno
+// nuevo — esto evita que un mismo escaneo aparezca duplicado en el
+// historial cuando primero se guarda localmente y después se confirma
+// el envío a Sheets.
+function actualizarLocalItemPorIdLocal(idLocal, cambios){
+  try{
+    const key='hist_'+fechaHoyStr.replace(/\//g,'_');
+    const items=JSON.parse(localStorage.getItem(key)||'[]');
+    const idx=items.findIndex(i=>i.id===idLocal);
+    if(idx>=0){ Object.assign(items[idx], cambios); localStorage.setItem(key,JSON.stringify(items)); }
+  }catch(e){}
+}
 function renderHistorial(){
   const items=cargarLocal();
   const el=document.getElementById('hist-lista');
@@ -725,6 +737,10 @@ function verificar(){
   document.getElementById('seccion-confirmar').style.display='block';
   document.getElementById('btn-cambios').style.display='block';
   document.getElementById('btn-incidencia').style.display=hayRechazo?'block':'none';
+  // Si hay fecha corta o producto vencido, NO debe poder confirmarse la
+  // recepción directamente sin avisar — solo queda disponible el botón
+  // de "Avisar incidencia a Recepciones", para que siempre pase por revisión.
+  document.querySelector('.btn-confirmar').style.display=hayRechazo?'none':'block';
   setTimeout(()=>document.getElementById('cantidad').focus(),150);
 }
 
@@ -732,6 +748,10 @@ function confirmarRecepcion(){
   try{
     if(!currentEAN || !A[currentEAN]){
       alert('No se pudo procesar: no hay un producto escaneado válido en este momento. Volvé a escanear el EAN.');
+      return;
+    }
+    if(hayRechazo){
+      alert('Este producto tiene fecha corta / está vencido. No se puede confirmar directamente — usá el botón "⚠ Avisar incidencia a Recepciones" para que lo revisen.');
       return;
     }
     const art=A[currentEAN];
@@ -800,13 +820,14 @@ function avisarIncidencia(){
     }
     const art=A[currentEAN];
     const cantidad=document.getElementById('cantidad').value||'';
+    const idHist=Date.now()+Math.random();
     const item={
+      idLocal:idHist,
       ean:currentEAN,descripcion:art.desc,marca:art.marca,
       fecha_vto:fechaVtoActual,dias:diasActual,cantidad,
       vu_orig:art.vu,vu_min:art.vu_min||''
     };
     bandeja.push(item);
-    const idHist=Date.now()+Math.random();
     const histItem={id:idHist,ean:currentEAN,descripcion:art.desc,marca:art.marca,fecha_vto:fechaVtoActual,dias:diasActual,cantidad,resultado:'FECHA CORTA',confirmado:false};
     guardarLocal(histItem);
     fetchConTimeout(SCRIPT_URL,{method:'POST',body:JSON.stringify({
@@ -842,12 +863,18 @@ function enviarUnaIncidencia(item){
     .then(r=>{ if(!r.ok) throw new Error('http '+r.status); return r.json(); })
     .then(data=>{
       if(!data || data.ok!==true) throw new Error('respuesta invalida');
-      const histItem={
-        id:Date.now()+Math.random(),ean:item.ean,descripcion:item.descripcion,marca:item.marca,
-        fecha_vto:item.fecha_vto,dias:item.dias,cantidad:item.cantidad,
-        resultado:'FECHA CORTA',incidenciaId:String(data.id),estado:'PENDIENTE'
-      };
-      guardarLocal(histItem);
+      if(item.idLocal){
+        actualizarLocalItemPorIdLocal(item.idLocal, {incidenciaId:String(data.id), estado:'PENDIENTE'});
+      } else {
+        // Reintento de un item viejo sin idLocal (de una sesión anterior) —
+        // no hay registro local para actualizar, se crea uno como respaldo.
+        guardarLocal({
+          id:Date.now()+Math.random(),ean:item.ean,descripcion:item.descripcion,marca:item.marca,
+          fecha_vto:item.fecha_vto,dias:item.dias,cantidad:item.cantidad,
+          resultado:'FECHA CORTA',incidenciaId:String(data.id),estado:'PENDIENTE'
+        });
+      }
+      renderHistorial();
       return {ok:true};
     })
     .catch(()=>{ return {ok:false}; });
@@ -894,25 +921,6 @@ function reintentarPendientesPerdidos(){
     fetchConTimeout(SCRIPT_URL,{method:'POST',body:JSON.stringify({accion:'registrar',fecha:fechaHoyStr,operario:getNombreOperario(),...p})}, 15000)
     .then(r=>{ if(!r.ok) throw new Error(); marcarRegistroConfirmado(p.id); })
     .catch(()=>{});
-  });
-
-  const perdidas=items.filter(i=>i.resultado==='FECHA CORTA' && !i.incidenciaId && i.confirmado===undefined);
-  perdidas.forEach(p=>{
-    enviarUnaIncidencia({
-      ean:p.ean,descripcion:p.descripcion,marca:p.marca,
-      fecha_vto:p.fecha_vto,dias:p.dias,cantidad:p.cantidad,
-      vu_orig:p.vu_orig||'',vu_min:p.vu_min||''
-    }).then(res=>{
-      if(res.ok){
-        try{
-          const key='hist_'+fechaHoyStr.replace(/\//g,'_');
-          const actuales=JSON.parse(localStorage.getItem(key)||'[]');
-          const filtrados=actuales.filter(x=>x.id!==p.id);
-          localStorage.setItem(key,JSON.stringify(filtrados));
-          renderHistorial();
-        }catch(e){}
-      }
-    });
   });
 
   const eansPendientes=items.filter(i=>i.resultado==='EAN DESCONOCIDO' && !i.confirmado);
